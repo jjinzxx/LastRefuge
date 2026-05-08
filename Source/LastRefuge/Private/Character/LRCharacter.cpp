@@ -13,35 +13,31 @@ ALRCharacter::ALRCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    // 캡슐 크기 (사람 크기 표준)
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
 
     // 1인칭 카메라
     FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
-    FirstPersonCamera->SetRelativeLocation(FVector(-10.f, 0.f, 60.f)); // 눈 높이
+    FirstPersonCamera->SetRelativeLocation(FVector(-10.f, 0.f, 60.f));
     FirstPersonCamera->bUsePawnControlRotation = true;
 
-    // 캐릭터 메쉬는 자기 자신에게 안 보이게 (1인칭)
     GetMesh()->SetOwnerNoSee(true);
 
-    // 컨트롤러 회전: Yaw만 따라가게 (Pitch는 카메라가 처리)
     bUseControllerRotationPitch = false;
     bUseControllerRotationYaw = true;
     bUseControllerRotationRoll = false;
 
-    // 이동 설정
     GetCharacterMovement()->bOrientRotationToMovement = false;
+    GetCharacterMovement()->NavAgentProps.bCanCrouch = false;
     GetCharacterMovement()->JumpZVelocity = 350.f;
     GetCharacterMovement()->AirControl = 0.35f;
-    GetCharacterMovement()->MaxWalkSpeed = 300.f; // Day 2에서 자세별로 변경
+    GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 }
 
 void ALRCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Enhanced Input Mapping Context 등록
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -62,18 +58,52 @@ void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
     {
         if (MoveAction)
-        {
             EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ALRCharacter::Move);
-        }
+
         if (LookAction)
-        {
             EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ALRCharacter::Look);
-        }
+
         if (JumpAction)
         {
             EIC->BindAction(JumpAction, ETriggerEvent::Started, this, &ALRCharacter::StartJump);
             EIC->BindAction(JumpAction, ETriggerEvent::Completed, this, &ALRCharacter::StopJump);
         }
+        if (CrouchAction)
+            EIC->BindAction(CrouchAction, ETriggerEvent::Started, this, &ALRCharacter::ToggleCrouch);
+
+        if (SprintAction)
+        {
+            EIC->BindAction(SprintAction, ETriggerEvent::Started, this, &ALRCharacter::StartSprint);
+            EIC->BindAction(SprintAction, ETriggerEvent::Completed, this, &ALRCharacter::StopSprint);
+        }
+    }
+}
+
+void ALRCharacter::SetMovementState(ELRMovementState NewState)
+{
+    if (MovementState == NewState) return;
+
+    MovementState = NewState;
+
+    switch (MovementState)
+    {
+    case ELRMovementState::Crouching:
+        GetCharacterMovement()->MaxWalkSpeed = CrouchSpeed;
+        TargetCameraHeight = CrouchCameraHeight;
+        TargetCapsuleHalfHeight = CrouchCapsuleHalfHeight;
+        break;
+
+    case ELRMovementState::Walking:
+        GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+        TargetCameraHeight = StandCameraHeight;
+        TargetCapsuleHalfHeight = StandCapsuleHalfHeight;
+        break;
+
+    case ELRMovementState::Running:
+        GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
+        TargetCameraHeight = StandCameraHeight;
+        TargetCapsuleHalfHeight = StandCapsuleHalfHeight;
+        break;
     }
 }
 
@@ -109,4 +139,46 @@ void ALRCharacter::StartJump(const FInputActionValue& Value)
 void ALRCharacter::StopJump(const FInputActionValue& Value)
 {
     StopJumping();
+}
+
+void ALRCharacter::ToggleCrouch(const FInputActionValue& Value)
+{
+    if (MovementState == ELRMovementState::Crouching)
+        SetMovementState(ELRMovementState::Walking);
+    else
+        SetMovementState(ELRMovementState::Crouching);
+}
+
+void ALRCharacter::StartSprint(const FInputActionValue& Value)
+{
+    // 앉은 상태에서는 달리기 불가
+    if (MovementState != ELRMovementState::Crouching)
+        SetMovementState(ELRMovementState::Running);
+}
+
+void ALRCharacter::StopSprint(const FInputActionValue& Value)
+{
+    if (MovementState == ELRMovementState::Running)
+        SetMovementState(ELRMovementState::Walking);
+}
+
+void ALRCharacter::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 카메라 높이 보간
+    FVector CameraLocation = FirstPersonCamera->GetRelativeLocation();
+    CameraLocation.Z = FMath::FInterpTo(CameraLocation.Z, TargetCameraHeight, DeltaTime, CrouchInterpSpeed);
+    FirstPersonCamera->SetRelativeLocation(CameraLocation);
+
+    // 캡슐 높이 보간
+    UCapsuleComponent* Capsule = GetCapsuleComponent();
+    float CurrentHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+    float NewHalfHeight = FMath::FInterpTo(CurrentHalfHeight, TargetCapsuleHalfHeight, DeltaTime, CrouchInterpSpeed);
+    Capsule->SetCapsuleHalfHeight(NewHalfHeight);
+
+    // 캡슐이 줄어들 때 캐릭터가 바닥에 붙어있도록 메쉬 오프셋 조정
+    FVector MeshLocation = GetMesh()->GetRelativeLocation();
+    MeshLocation.Z = -NewHalfHeight;
+    GetMesh()->SetRelativeLocation(MeshLocation);
 }
