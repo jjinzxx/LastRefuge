@@ -32,7 +32,7 @@ ALRCharacter::ALRCharacter()
 
     // 이동 설정
     GetCharacterMovement()->bOrientRotationToMovement = false;
-    GetCharacterMovement()->JumpZVelocity = 500.f;
+    GetCharacterMovement()->JumpZVelocity = 350.f;
     GetCharacterMovement()->AirControl = 0.35f;
     GetCharacterMovement()->MaxWalkSpeed = 300.f; // Day 2에서 자세별로 변경
 }
