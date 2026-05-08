@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "LRCharacter.generated.h"
 
+class ULRStatusComponent;
 class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
@@ -35,6 +36,9 @@ protected:
     // === Components ===
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
     TObjectPtr<UCameraComponent> FirstPersonCamera;
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status")
+    TObjectPtr<ULRStatusComponent> StatusComponent;
 
     // === Input ===
     UPROPERTY(EditDefaultsOnly, Category = "Input")

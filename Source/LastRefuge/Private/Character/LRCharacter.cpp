@@ -8,10 +8,12 @@
 #include "InputMappingContext.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
+#include "Components/LRStatusComponent.h"
 
 ALRCharacter::ALRCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
+    StatusComponent = CreateDefaultSubobject<ULRStatusComponent>(TEXT("StatusComponent"));
 
     GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
 
@@ -181,4 +183,21 @@ void ALRCharacter::Tick(float DeltaTime)
     FVector MeshLocation = GetMesh()->GetRelativeLocation();
     MeshLocation.Z = -NewHalfHeight;
     GetMesh()->SetRelativeLocation(MeshLocation);
+    
+    // 달리는 중이면 스테미나 소모
+    if (MovementState == ELRMovementState::Running)
+    {
+        StatusComponent->ConsumeStamina(StatusComponent->GetStaminaDrainRate() * DeltaTime);
+
+        // 스테미나 바닥나면 강제로 걷기 전환
+        if (StatusComponent->IsStaminaEmpty())
+        {
+            SetMovementState(ELRMovementState::Walking);
+        }
+    }
+    // 디버그 출력 (Day 12 UI 완성 후 삭제)
+    GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::Yellow,
+        FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
+    GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red,
+        FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
 }
