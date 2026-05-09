@@ -13,6 +13,7 @@ const FName ALRBotAIController::BB_PatrolTarget(TEXT("PatrolTarget"));
 const FName ALRBotAIController::BB_PatrolIndex(TEXT("PatrolIndex"));
 const FName ALRBotAIController::BB_PlayerActor(TEXT("PlayerActor"));
 const FName ALRBotAIController::BB_BotState(TEXT("BotState"));
+const FName ALRBotAIController::BB_LKL(TEXT("LKL"));
 
 void ALRBotAIController::OnPossess(APawn* InPawn)
 {
@@ -129,7 +130,7 @@ void ALRBotAIController::EnterSuspicious(const FVector& InLKL)
     if (UBlackboardComponent* BB = GetBlackboardComponent())
     {
         BB->SetValueAsObject(BB_PlayerActor, nullptr);
-        BB->SetValueAsVector(TEXT("LKL"), InLKL);
+        BB->SetValueAsVector(BB_LKL, InLKL);
         BB->SetValueAsVector(BB_PatrolTarget, InLKL);
         BB->SetValueAsInt(BB_BotState, 1);
     }
@@ -146,6 +147,18 @@ void ALRBotAIController::EnterPatrol()
     {
         BB->SetValueAsObject(BB_PlayerActor, nullptr);
         BB->SetValueAsInt(BB_BotState, 0);
+
+        // Suspicious에서 LKL로 덮어쓴 PatrolTarget을 현재 PatrolIndex 위치로 복원
+        if (ControlledBot && ControlledBot->GetPatrolPointCount() > 0)
+        {
+            const int32 Idx = BB->GetValueAsInt(BB_PatrolIndex);
+            bool bValid = false;
+            const FVector Loc = ControlledBot->GetPatrolPointLocation(Idx, bValid);
+            if (bValid)
+            {
+                BB->SetValueAsVector(BB_PatrolTarget, Loc);
+            }
+        }
     }
 }
 

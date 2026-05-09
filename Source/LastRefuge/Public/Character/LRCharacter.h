@@ -36,6 +36,10 @@ public:
     UFUNCTION(BlueprintPure, Category = "Movement")
     ELRMovementState GetMovementState() const { return MovementState; }
 
+    /** 엔진 데미지 파이프라인을 ULRStatusComponent로 라우팅 */
+    virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent,
+        AController* EventInstigator, AActor* DamageCauser) override;
+
 protected:
     virtual void BeginPlay() override;
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
