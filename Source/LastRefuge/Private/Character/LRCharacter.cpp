@@ -12,6 +12,7 @@
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISense_Hearing.h"
+#include "LRGameMode.h" 
 
 ALRCharacter::ALRCharacter()
 {
@@ -59,6 +60,8 @@ void ALRCharacter::BeginPlay()
             }
         }
     }
+    
+    StatusComponent->OnHealthChanged.AddDynamic(this, &ALRCharacter::OnHealthChanged);
 }
 
 void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -273,4 +276,17 @@ void ALRCharacter::Tick(float DeltaTime)
         FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
     GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red,
         FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
+}
+
+void ALRCharacter::OnHealthChanged(float NewHealth, float MaxHealth)
+{
+    if (NewHealth <= 0.f)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Character] Health 0 — Game Over"));
+
+        if (ALRGameMode* GM = Cast<ALRGameMode>(GetWorld()->GetAuthGameMode()))
+        {
+            GM->OnPlayerDied(GetController());
+        }
+    }
 }

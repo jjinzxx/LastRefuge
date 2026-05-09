@@ -1,122 +1,209 @@
 #include "AI/LRBotAIController.h"
 #include "AI/LRBot.h"
-
-#include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISense_Hearing.h"
-#include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "DrawDebugHelpers.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 
-// Blackboard 키 이름 — BB_LRBot의 키 이름과 정확히 일치
-const FName ALRBotAIController::BB_PatrolTarget = TEXT("PatrolTarget");
-const FName ALRBotAIController::BB_PatrolIndex  = TEXT("PatrolIndex");
-
-ALRBotAIController::ALRBotAIController()
-{
-    // BlackboardComponent는 AAIController가 기본 보유, 별도 생성 불필요
-}
+const FName ALRBotAIController::BB_PatrolTarget(TEXT("PatrolTarget"));
+const FName ALRBotAIController::BB_PatrolIndex(TEXT("PatrolIndex"));
+const FName ALRBotAIController::BB_PlayerActor(TEXT("PlayerActor"));
+const FName ALRBotAIController::BB_BotState(TEXT("BotState"));
 
 void ALRBotAIController::OnPossess(APawn* InPawn)
 {
     Super::OnPossess(InPawn);
-    UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] OnPossess called"));
 
     ControlledBot = Cast<ALRBot>(InPawn);
-    if (!ControlledBot)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] Cast failed"));
-        return;
-    }
-    UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] Cast success"));
+    if (!ControlledBot) return;
 
-    UAIPerceptionComponent* PerceptionComp = ControlledBot->GetPerceptionComponent();
-    if (PerceptionComp)
-    {
-        PerceptionComp->OnTargetPerceptionUpdated.AddDynamic(
-            this, &ALRBotAIController::OnPerceptionUpdated);
-    }
-
-    UBehaviorTree* BT = ControlledBot->GetBehaviorTreeAsset();
-    if (!BT)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] BT is null"));
-        return;
-    }
-    UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] BT found, running"));
-
-    RunBehaviorTree(BT);
-    UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] RunBehaviorTree called"));
+    if (UBehaviorTree* BT = ControlledBot->BehaviorTreeAsset)
+        RunBehaviorTree(BT);
 
     if (UBlackboardComponent* BB = GetBlackboardComponent())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] BB found, setting values"));
         BB->SetValueAsInt(BB_PatrolIndex, 0);
-
-        bool bValid = false;
-        const FVector FirstTarget = ControlledBot->GetPatrolPointLocation(0, bValid);
-        if (bValid)
-        {
-            BB->SetValueAsVector(BB_PatrolTarget, FirstTarget);
-            UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] PatrolTarget set"));
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] PatrolPoint[0] invalid"));
-        }
+        bool bValid;
+        FVector FirstPoint = ControlledBot->GetPatrolPointLocation(0, bValid);
+        if (bValid) BB->SetValueAsVector(BB_PatrolTarget, FirstPoint);
+        BB->SetValueAsInt(BB_BotState, 0);
     }
-    else
+
+    if (UAIPerceptionComponent* PC = ControlledBot->GetPerceptionComponent())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[LRBotAIController] BB is null"));
+        PC->OnTargetPerceptionUpdated.AddDynamic(
+            this, &ALRBotAIController::OnPerceptionUpdated);
     }
 }
 
 void ALRBotAIController::OnUnPossess()
 {
-    // 빙의 해제 시 Perception 콜백 제거
+    StopFiring();
+
+    if (GetWorld())
+        GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
+
     if (ControlledBot)
     {
-        if (UAIPerceptionComponent* PerceptionComp = ControlledBot->GetPerceptionComponent())
+        if (UAIPerceptionComponent* PC = ControlledBot->GetPerceptionComponent())
         {
-            PerceptionComp->OnTargetPerceptionUpdated.RemoveDynamic(
+            PC->OnTargetPerceptionUpdated.RemoveDynamic(
                 this, &ALRBotAIController::OnPerceptionUpdated);
         }
     }
-
     ControlledBot = nullptr;
+    TrackedPlayer = nullptr;
+
     Super::OnUnPossess();
 }
 
+// ── Perception ──────────────────────────────────────────
 void ALRBotAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-    if (Stimulus.Type == UAISense::GetSenseID<UAISense_Sight>())
+    if (!Actor || !ControlledBot) return;
+
+    const bool bSight   = Stimulus.Type == UAISense::GetSenseID<UAISense_Sight>();
+    const bool bHearing = Stimulus.Type == UAISense::GetSenseID<UAISense_Hearing>();
+
+    if (bSight)
     {
         if (Stimulus.WasSuccessfullySensed())
         {
-            UE_LOG(LogTemp, Warning, TEXT("[LRBot] Player Sighted"));
-
-            // 추격 속도로 전환
-            if (ControlledBot)
-            {
-                ControlledBot->GetCharacterMovement()->MaxWalkSpeed = ControlledBot->ChaseSpeed;
-            }
+            TrackedPlayer = Actor;
+            ControlledBot->LastKnownLocation = Actor->GetActorLocation();
+            EnterCombat(Actor);
         }
         else
         {
-            UE_LOG(LogTemp, Warning, TEXT("[LRBot] Player Lost (Sight)"));
-
-            // 순찰 속도로 복귀
-            if (ControlledBot)
-            {
-                ControlledBot->GetCharacterMovement()->MaxWalkSpeed = ControlledBot->PatrolSpeed;
-            }
+            EnterSuspicious(ControlledBot->LastKnownLocation);
         }
     }
-    else if (Stimulus.Type == UAISense::GetSenseID<UAISense_Hearing>())
+    else if (bHearing)
     {
-        if (Stimulus.WasSuccessfullySensed())
+        if (Stimulus.WasSuccessfullySensed() &&
+            ControlledBot->GetBotState() == ELRBotState::Patrol)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[LRBot] Player Heard"));
+            UE_LOG(LogTemp, Log, TEXT("[LRBot] Heard — going Suspicious"));
+            EnterSuspicious(Stimulus.StimulusLocation);
         }
+    }
+}
+
+// ── 상태 전환 ────────────────────────────────────────────
+void ALRBotAIController::EnterCombat(AActor* PlayerActor)
+{
+    UE_LOG(LogTemp, Warning, TEXT("[LRBot] → COMBAT"));
+    ControlledBot->SetBotState(ELRBotState::Combat);
+
+    if (UBlackboardComponent* BB = GetBlackboardComponent())
+    {
+        BB->SetValueAsObject(BB_PlayerActor, PlayerActor);
+        BB->SetValueAsInt(BB_BotState, 2);
+    }
+
+    StartFiring();
+
+    // 0.1초마다 플레이어 위치를 BB PatrolTarget에 갱신
+    GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
+    GetWorld()->GetTimerManager().SetTimer(
+        CombatTrackingHandle,
+        this,
+        &ALRBotAIController::UpdateCombatTarget,
+        0.1f, true, 0.f);
+}
+
+void ALRBotAIController::EnterSuspicious(const FVector& InLKL)
+{
+    UE_LOG(LogTemp, Warning, TEXT("[LRBot] → SUSPICIOUS"));
+    StopFiring();
+
+    GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
+
+    TrackedPlayer = nullptr;
+    ControlledBot->SetBotState(ELRBotState::Suspicious);
+
+    if (UBlackboardComponent* BB = GetBlackboardComponent())
+    {
+        BB->SetValueAsObject(BB_PlayerActor, nullptr);
+        BB->SetValueAsVector(TEXT("LKL"), InLKL);
+        BB->SetValueAsVector(BB_PatrolTarget, InLKL);
+        BB->SetValueAsInt(BB_BotState, 1);
+    }
+}
+
+void ALRBotAIController::EnterPatrol()
+{
+    UE_LOG(LogTemp, Log, TEXT("[LRBot] → PATROL"));
+    ControlledBot->SetBotState(ELRBotState::Patrol);
+
+    GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
+
+    if (UBlackboardComponent* BB = GetBlackboardComponent())
+    {
+        BB->SetValueAsObject(BB_PlayerActor, nullptr);
+        BB->SetValueAsInt(BB_BotState, 0);
+    }
+}
+
+// ── Combat 실시간 위치 추적 ──────────────────────────────
+void ALRBotAIController::UpdateCombatTarget()
+{
+    if (!TrackedPlayer || !ControlledBot) return;
+
+    FVector PlayerLocation = TrackedPlayer->GetActorLocation();
+    ControlledBot->LastKnownLocation = PlayerLocation;
+
+    if (UBlackboardComponent* BB = GetBlackboardComponent())
+    {
+        // PatrolTarget을 0.1초마다 갱신 → Move To가 계속 재이동
+        BB->SetValueAsVector(BB_PatrolTarget, PlayerLocation);
+    }
+}
+
+// ── 사격 ────────────────────────────────────────────────
+void ALRBotAIController::StartFiring()
+{
+    if (GetWorld()->GetTimerManager().IsTimerActive(FireTimerHandle)) return;
+    GetWorld()->GetTimerManager().SetTimer(
+        FireTimerHandle, this, &ALRBotAIController::FireAtPlayer,
+        ControlledBot->FireInterval, true, 0.5f);
+}
+
+void ALRBotAIController::StopFiring()
+{
+    if (GetWorld())
+        GetWorld()->GetTimerManager().ClearTimer(FireTimerHandle);
+}
+
+void ALRBotAIController::FireAtPlayer()
+{
+    if (!ControlledBot || !TrackedPlayer) { StopFiring(); return; }
+
+    FVector Start = ControlledBot->GetActorLocation() + FVector(0, 0, 60.f);
+    FVector End   = TrackedPlayer->GetActorLocation();
+
+    FHitResult Hit;
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(ControlledBot);
+
+    bool bHit = GetWorld()->LineTraceSingleByChannel(
+        Hit, Start, End, ECC_Visibility, Params);
+
+#if WITH_EDITOR
+    DrawDebugLine(GetWorld(), Start, bHit ? Hit.Location : End,
+        bHit ? FColor::Red : FColor::Yellow, false, 0.8f, 0, 1.5f);
+#endif
+
+    if (bHit && Hit.GetActor() == TrackedPlayer)
+    {
+        UGameplayStatics::ApplyDamage(
+            TrackedPlayer, ControlledBot->FireDamage,
+            this, ControlledBot, nullptr);
+
+        UE_LOG(LogTemp, Warning, TEXT("[LRBot] Hit! %.0f dmg"), ControlledBot->FireDamage);
     }
 }

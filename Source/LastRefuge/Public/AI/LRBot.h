@@ -9,6 +9,15 @@ class UAISenseConfig_Sight;
 class UAISenseConfig_Hearing;
 class UBehaviorTree;
 
+// ELRBotState
+UENUM(BlueprintType)
+enum class ELRBotState : uint8
+{
+	Patrol      UMETA(DisplayName = "Patrol"),
+	Suspicious  UMETA(DisplayName = "Suspicious"),
+	Combat      UMETA(DisplayName = "Combat")
+};
+
 UCLASS()
 class LASTREFUGE_API ALRBot : public ACharacter
 {
@@ -50,9 +59,28 @@ public:
 
 	// bot 순찰 뛰기 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LR|AI|Movement")
-	float ChaseSpeed = 350.f;
+	float ChaseSpeed = 280.f;
 	
 	virtual void Tick(float DeltaTime) override;
+	
+	// 상태
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|State")
+	ELRBotState CurrentState = ELRBotState::Patrol;
+
+	// LKL
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|State")
+	FVector LastKnownLocation = FVector::ZeroVector;
+
+	// 사격 수치
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
+	float FireDamage = 25.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
+	float FireInterval = 1.5f;
+
+	// 상태 전환
+	void SetBotState(ELRBotState NewState);
+	ELRBotState GetBotState() const { return CurrentState; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -64,7 +92,7 @@ protected:
 	float SightRadius = 1500.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Perception|Sight")
-	float LoseSightRadius = 1800.f;
+	float LoseSightRadius = 2500.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Perception|Sight")
 	float PeripheralVisionHalfAngleDegrees = 45.f;

@@ -88,3 +88,18 @@ void ALRBot::Tick(float DeltaTime)
 	);
 #endif
 }
+
+void ALRBot::SetBotState(ELRBotState NewState)
+{
+	if (CurrentState == NewState) return;
+	CurrentState = NewState;
+
+	float TargetSpeed = (NewState == ELRBotState::Combat) ? ChaseSpeed : PatrolSpeed;
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->MaxWalkSpeed = TargetSpeed;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[LRBot] State → %s"),
+		*UEnum::GetValueAsString(NewState));
+}
