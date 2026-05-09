@@ -93,18 +93,21 @@ void ALRCharacter::SetMovementState(ELRMovementState NewState)
         GetCharacterMovement()->MaxWalkSpeed = CrouchSpeed;
         TargetCameraHeight = CrouchCameraHeight;
         TargetCapsuleHalfHeight = CrouchCapsuleHalfHeight;
+        StatusComponent->UpdateNoiseRadius(StatusComponent->CrouchNoiseRadius);
         break;
 
     case ELRMovementState::Walking:
         GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
         TargetCameraHeight = StandCameraHeight;
         TargetCapsuleHalfHeight = StandCapsuleHalfHeight;
+        StatusComponent->UpdateNoiseRadius(StatusComponent->WalkNoiseRadius);
         break;
 
     case ELRMovementState::Running:
         GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
         TargetCameraHeight = StandCameraHeight;
         TargetCapsuleHalfHeight = StandCapsuleHalfHeight;
+        StatusComponent->UpdateNoiseRadius(StatusComponent->RunNoiseRadius);
         break;
     }
 }
@@ -195,7 +198,50 @@ void ALRCharacter::Tick(float DeltaTime)
             SetMovementState(ELRMovementState::Walking);
         }
     }
-    // 디버그 출력 (Day 12 UI 완성 후 삭제)
+    // MakeNoise (AI 청각 감지용)
+    NoiseMakeTimer += DeltaTime;
+    if (!GetVelocity().IsZero() && NoiseMakeTimer >= 0.2f)
+    {
+        NoiseMakeTimer = 0.f;
+        MakeNoise(
+            StatusComponent->GetNoiseRadius() / StatusComponent->RunNoiseRadius,
+            this,
+            GetActorLocation()
+        );
+    }
+    // 소음 반경 시각화 - 나중에 비활성화
+    if (StatusComponent->GetNoiseRadius() > 0.f)
+    {
+        FColor SphereColor;
+        switch (MovementState)
+        {
+        case ELRMovementState::Crouching:
+            SphereColor = FColor::Green;
+            break;
+        case ELRMovementState::Walking:
+            SphereColor = FColor::Yellow;
+            break;
+        case ELRMovementState::Running:
+            SphereColor = FColor::Red;
+            break;
+        default:
+            SphereColor = FColor::White;
+        }
+
+        DrawDebugSphere(
+            GetWorld(),
+            GetActorLocation(),
+            StatusComponent->GetNoiseRadius(),
+            16,
+            SphereColor,
+            false,
+            -1.f
+        );
+    }
+
+    // 소음 반경 디버그 수치 출력
+    GEngine->AddOnScreenDebugMessage(2, 0.f, FColor::Cyan,
+        FString::Printf(TEXT("Noise Radius: %.0f"), StatusComponent->GetNoiseRadius()));
     GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::Yellow,
         FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
     GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red,

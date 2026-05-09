@@ -61,3 +61,8 @@ void ULRStatusComponent::RestoreStamina(float Amount)
 	Stamina = FMath::Clamp(Stamina + Amount, 0.f, MaxStamina);
 	OnStaminaChanged.Broadcast(Stamina, MaxStamina);
 }
+
+void ULRStatusComponent::UpdateNoiseRadius(float NewRadius)
+{
+	CurrentNoiseRadius = NewRadius;
+}

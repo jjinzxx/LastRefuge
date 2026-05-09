@@ -22,6 +22,8 @@ UCLASS()
 class LASTREFUGE_API ALRCharacter : public ACharacter
 {
     GENERATED_BODY()
+private:
+    float NoiseMakeTimer = 0.f;
 
 public:
     ALRCharacter();

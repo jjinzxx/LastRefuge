@@ -53,6 +53,23 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category = "Status")
     FOnStaminaChanged OnStaminaChanged;
+    
+    // === 소음 ===
+    UFUNCTION(BlueprintPure, Category = "Status")
+    float GetNoiseRadius() const { return CurrentNoiseRadius; }
+
+    UFUNCTION(BlueprintCallable, Category = "Status")
+    void UpdateNoiseRadius(float NewRadius);
+    
+    UPROPERTY(EditDefaultsOnly, Category = "Status")
+    float CrouchNoiseRadius = 200.f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Status")
+    float WalkNoiseRadius = 600.f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Status")
+    float RunNoiseRadius = 1500.f;
+
 
 protected:
     virtual void BeginPlay() override;
@@ -81,7 +98,9 @@ protected:
     float StaminaRegenDelay = 1.5f;  // 스테미나 소모 후 회복 시작까지 대기 시간
     
 
+
 private:
     float StaminaRegenTimer = 0.f;
     bool bIsDraining = false;
+    float CurrentNoiseRadius = 0.f;
 };
