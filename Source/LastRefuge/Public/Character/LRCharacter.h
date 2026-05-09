@@ -92,13 +92,13 @@ protected:
     ELRMovementState MovementState = ELRMovementState::Walking;
 
     UPROPERTY(EditDefaultsOnly, Category = "Movement")
-    float CrouchSpeed = 150.f;
+    float CrouchSpeed = 100.f;
 
     UPROPERTY(EditDefaultsOnly, Category = "Movement")
-    float WalkSpeed = 300.f;
+    float WalkSpeed = 250.f;
 
     UPROPERTY(EditDefaultsOnly, Category = "Movement")
-    float RunSpeed = 600.f;
+    float RunSpeed = 400.f;
 
     void SetMovementState(ELRMovementState NewState);
 
