@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "LRCharacter.generated.h"
 
 class ULRStatusComponent;
@@ -34,6 +35,10 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+    
+    /** AIPerception이 이 캐릭터를 시각/청각 자극원으로 인식하기 위한 컴포넌트 */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
+    TObjectPtr<class UAIPerceptionStimuliSourceComponent> StimuliSource;
 
     // === Components ===
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
@@ -105,4 +110,7 @@ protected:
     void ToggleCrouch(const FInputActionValue& Value);
     void StartSprint(const FInputActionValue& Value);
     void StopSprint(const FInputActionValue& Value);
+    
+    // === 현재 이동 상태에 따른 청각 자극을 AIPerception 시스템에 보고 ===
+    void ReportMovementNoise();
 };

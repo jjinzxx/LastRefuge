@@ -19,7 +19,10 @@ public class LastRefuge : ModuleRules
 			"GameplayStateTreeModule",
 			"UMG",
 			"Slate",
-			"EnhancedInput"
+			"EnhancedInput",
+			"AIModule",
+			"NavigationSystem", 
+			"GameplayTasks"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

@@ -9,6 +9,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "Components/LRStatusComponent.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense_Sight.h"
+#include "Perception/AISense_Hearing.h"
 
 ALRCharacter::ALRCharacter()
 {
@@ -34,6 +37,11 @@ ALRCharacter::ALRCharacter()
     GetCharacterMovement()->JumpZVelocity = 350.f;
     GetCharacterMovement()->AirControl = 0.35f;
     GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+    
+    StimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("StimuliSource"));
+    StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
+    StimuliSource->RegisterForSense(UAISense_Hearing::StaticClass());
+    StimuliSource->bAutoRegister = true;
 }
 
 void ALRCharacter::BeginPlay()
@@ -167,6 +175,29 @@ void ALRCharacter::StopSprint(const FInputActionValue& Value)
         SetMovementState(ELRMovementState::Walking);
 }
 
+void ALRCharacter::ReportMovementNoise()
+{
+    if (!StatusComponent) return;
+
+    // 실제로 이동 중일 때만 소음 발생
+    const float CurrentSpeed = GetVelocity().Size2D();
+    if (CurrentSpeed < 10.f) return;
+
+    const float NoiseRadius = StatusComponent->GetNoiseRadius();
+    if (NoiseRadius <= 0.f) return;
+
+    const float Loudness = FMath::Clamp(NoiseRadius / 1500.f, 0.f, 1.f);
+
+    UAISense_Hearing::ReportNoiseEvent(
+        GetWorld(),
+        GetActorLocation(),
+        Loudness,
+        this,
+        NoiseRadius,
+        NAME_None
+    );
+}
+
 void ALRCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
@@ -203,11 +234,7 @@ void ALRCharacter::Tick(float DeltaTime)
     if (!GetVelocity().IsZero() && NoiseMakeTimer >= 0.2f)
     {
         NoiseMakeTimer = 0.f;
-        MakeNoise(
-            StatusComponent->GetNoiseRadius() / StatusComponent->RunNoiseRadius,
-            this,
-            GetActorLocation()
-        );
+        ReportMovementNoise();
     }
     // 소음 반경 시각화 - 나중에 비활성화
     if (StatusComponent->GetNoiseRadius() > 0.f)
