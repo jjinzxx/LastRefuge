@@ -46,4 +46,5 @@ private:
 	static const FName BB_PatrolIndex;
 	static const FName BB_PlayerActor;
 	static const FName BB_BotState;
+	static const FName BB_LKL;
 };
