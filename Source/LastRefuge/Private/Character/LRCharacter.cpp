@@ -278,6 +278,17 @@ void ALRCharacter::Tick(float DeltaTime)
         FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
 }
 
+float ALRCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
+    AController* EventInstigator, AActor* DamageCauser)
+{
+    const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+    if (StatusComponent && Applied > 0.f)
+    {
+        StatusComponent->ApplyDamage(Applied);
+    }
+    return Applied;
+}
+
 void ALRCharacter::OnHealthChanged(float NewHealth, float MaxHealth)
 {
     if (NewHealth <= 0.f)
