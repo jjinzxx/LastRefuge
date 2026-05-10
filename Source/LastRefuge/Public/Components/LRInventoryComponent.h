@@ -15,11 +15,16 @@ class LASTREFUGE_API ULRInventoryComponent : public UActorComponent
 public:
 	ULRInventoryComponent();
 
-	// 아이템 추가 시도
+protected:
+	// 아래 두 줄의 선언이 추가되어야 합니다.
+	virtual void BeginPlay() override;
+
+public:
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool AddItem(ULRItemDataAsset* Item, int32 Amount);
 
-	// 아이템 제거 시도
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool RemoveItem(ULRItemDataAsset* Item, int32 Amount);
 
