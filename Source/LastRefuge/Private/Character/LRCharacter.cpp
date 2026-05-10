@@ -14,6 +14,7 @@
 #include "Perception/AISense_Hearing.h"
 #include "LRGameMode.h" 
 #include "Components/LRInventoryComponent.h"
+#include "Items/LRItemDataAsset.h"
 
 ALRCharacter::ALRCharacter()
 {
@@ -51,6 +52,16 @@ ALRCharacter::ALRCharacter()
 void ALRCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    
+    // 인벤토리 컴포넌트가 있는지 확인
+    if (InventoryComponent)
+    {
+        UE_LOG(LogTemp, Log, TEXT("Inventory System Initialized."));
+        
+        // 여기에 에디터에서 생성한 DataAsset을 블루프린트로 전달받아 
+        // AddItem을 호출해보면 로그로 성공 여부를 알 수 있습니다.
+    }
+    
 
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {

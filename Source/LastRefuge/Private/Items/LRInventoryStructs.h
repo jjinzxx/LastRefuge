@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "LRItemDataAsset.h"
+#include "Items/LRItemDataAsset.h"
 #include "LRInventoryStructs.generated.h"
 
 USTRUCT(BlueprintType)
