@@ -15,13 +15,7 @@ class LASTREFUGE_API ULRInventoryComponent : public UActorComponent
 public:
 	ULRInventoryComponent();
 
-protected:
-	// 아래 두 줄의 선언이 추가되어야 합니다.
-	virtual void BeginPlay() override;
-
-public:
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-
+	// 링커 에러 방지를 위해 정의가 확실히 존재하는 함수들만 선언합니다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool AddItem(ULRItemDataAsset* Item, int32 Amount);
 
