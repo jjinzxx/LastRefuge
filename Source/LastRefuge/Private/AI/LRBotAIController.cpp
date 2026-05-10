@@ -203,9 +203,10 @@ void ALRBotAIController::FireAtPlayer()
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(ControlledBot);
 
+    // TODO: 근접 전투 시스템 도입 시 봇 위협 수단 재설계
     bool bHit = GetWorld()->LineTraceSingleByChannel(
-        Hit, Start, End, ECC_Visibility, Params);
-
+        Hit, Start, End, ECC_Pawn, Params);
+    
 #if WITH_EDITOR
     DrawDebugLine(GetWorld(), Start, bHit ? Hit.Location : End,
         bHit ? FColor::Red : FColor::Yellow, false, 0.8f, 0, 1.5f);
