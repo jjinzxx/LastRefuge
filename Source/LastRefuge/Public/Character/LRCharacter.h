@@ -10,6 +10,7 @@ class UCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
+class ULRInventoryComponent;
 
 UENUM(BlueprintType)
 enum class ELRMovementState : uint8
@@ -29,6 +30,9 @@ private:
     
     UFUNCTION()
     void OnHealthChanged(float NewHealth, float MaxHealth);
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<ULRInventoryComponent> InventoryComponent;
 
 public:
     ALRCharacter();

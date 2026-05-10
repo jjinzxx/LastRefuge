@@ -13,6 +13,7 @@
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISense_Hearing.h"
 #include "LRGameMode.h" 
+#include "Components/LRInventoryComponent.h"
 
 ALRCharacter::ALRCharacter()
 {
@@ -43,6 +44,8 @@ ALRCharacter::ALRCharacter()
     StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
     StimuliSource->RegisterForSense(UAISense_Hearing::StaticClass());
     StimuliSource->bAutoRegister = true;
+    
+    InventoryComponent = CreateDefaultSubobject<ULRInventoryComponent>(TEXT("InventoryComponent"));
 }
 
 void ALRCharacter::BeginPlay()
