@@ -2,12 +2,22 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "TimerManager.h"
+#include "AI/LRBotAIController.h"
 
 void ALRGameMode::OnPlayerDied(AController* DeadController)
 {
 	if (!DeadController) return;
 
 	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Player Died — respawn in %.1fs"), RespawnDelay);
+
+	// 모든 LRBot AI를 Patrol로 강제 복귀 (옛 사망 위치 응시 방지)
+	for (TActorIterator<ALRBotAIController> It(GetWorld()); It; ++It)
+	{
+		if (ALRBotAIController* BotAI = *It)
+		{
+			BotAI->AbortToPatrol();
+		}
+	}
 
 	if (APawn* OldPawn = DeadController->GetPawn())
 	{

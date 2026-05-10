@@ -19,6 +19,9 @@ protected:
 public:
 	void EnterPatrol();
 
+	/** 플레이어 사망 시 GameMode가 호출 — Combat/Suspicious를 끊고 Patrol로 강제 복귀 */
+	void AbortToPatrol();
+
 private:
 	UFUNCTION()
 	void OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);

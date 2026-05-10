@@ -88,7 +88,7 @@ void ALRBotAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus
         if (Stimulus.WasSuccessfullySensed() &&
             ControlledBot->GetBotState() == ELRBotState::Patrol)
         {
-            UE_LOG(LogTemp, Log, TEXT("[LRBot] Heard — going Suspicious"));
+            UE_LOG(LogTemp, Warning, TEXT("[LRBot] Heard — going Suspicious"));
             EnterSuspicious(Stimulus.StimulusLocation);
         }
     }
@@ -160,6 +160,22 @@ void ALRBotAIController::EnterPatrol()
             }
         }
     }
+}
+
+void ALRBotAIController::AbortToPatrol()
+{
+    UE_LOG(LogTemp, Warning, TEXT("[LRBot] AbortToPatrol (player died)"));
+
+    StopFiring();
+
+    if (GetWorld())
+        GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
+
+    TrackedPlayer = nullptr;
+    if (ControlledBot)
+        ControlledBot->LastKnownLocation = FVector::ZeroVector;
+
+    EnterPatrol();
 }
 
 // ── Combat 실시간 위치 추적 ──────────────────────────────
