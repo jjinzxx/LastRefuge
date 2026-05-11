@@ -16,6 +16,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameMode")
 	float RespawnDelay = 3.f;
 
+	// 설정 시 사망하면 해당 레벨로 이동 (위험지대용, 기지는 비워두면 제자리 리스폰)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameMode")
+	FName RespawnLevelName;
+
 private:
 	UFUNCTION()
 	void RespawnPlayer(AController* Controller);

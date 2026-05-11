@@ -18,6 +18,10 @@ public:
 	virtual void BeginInteract(class ALRCharacter* Player) override;
 	virtual void EndInteract(class ALRCharacter* Player) override;
 	virtual float GetInteractionDuration() const override;
+	virtual FText GetInteractionPrompt() const override;
+	virtual FText GetProgressText() const override;
+	virtual FText GetStartText() const override;
+	virtual FText GetCancelText() const override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

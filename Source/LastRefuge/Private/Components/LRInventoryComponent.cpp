@@ -57,6 +57,12 @@ void ULRInventoryComponent::ApplyItemEffects(const ULRItemDataAsset* ItemData)
     }
 }
 
+void ULRInventoryComponent::ClearInventory()
+{
+    InventorySlots.Empty();
+    OnInventoryUpdated.Broadcast();
+}
+
 bool ULRInventoryComponent::AddItem(ULRItemDataAsset* Item, int32 Amount)
 {
     if (!Item || Amount <= 0) return false;

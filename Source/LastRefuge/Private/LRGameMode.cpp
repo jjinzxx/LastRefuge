@@ -1,14 +1,22 @@
 #include "LRGameMode.h"
+#include "LRGameInstance.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 #include "TimerManager.h"
 #include "AI/LRBotAIController.h"
+#include "Kismet/GameplayStatics.h"
 
 void ALRGameMode::OnPlayerDied(AController* DeadController)
 {
 	if (!DeadController) return;
 
 	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Player Died — respawn in %.1fs"), RespawnDelay);
+
+	// 사망 시 GameInstance 인벤토리 초기화 (보관함은 유지)
+	if (ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance()))
+	{
+		GI->PersistentInventory.Empty();
+	}
 
 	// 모든 LRBot AI를 Patrol로 강제 복귀 (옛 사망 위치 응시 방지)
 	for (TActorIterator<ALRBotAIController> It(GetWorld()); It; ++It)
@@ -23,6 +31,13 @@ void ALRGameMode::OnPlayerDied(AController* DeadController)
 	{
 		DeadController->UnPossess();
 		OldPawn->Destroy();
+	}
+
+	// 위험지대: RespawnLevelName이 설정되어 있으면 해당 레벨로 이동
+	if (!RespawnLevelName.IsNone())
+	{
+		UGameplayStatics::OpenLevel(this, RespawnLevelName);
+		return;
 	}
 
 	FTimerHandle RespawnHandle;

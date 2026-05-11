@@ -29,6 +29,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "LR|Inventory")
 	bool UseItem(int32 SlotIndex);
 
+	UFUNCTION(BlueprintPure, Category = "LR|Inventory")
+	const TArray<FLRItemSlot>& GetInventorySlots() const { return InventorySlots; }
+
+	UFUNCTION(BlueprintCallable, Category = "LR|Inventory")
+	void ClearInventory();
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
 	int32 InventorySlotsMax = 20;

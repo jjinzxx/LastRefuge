@@ -55,6 +55,25 @@ void ALRContainer::EndInteract(ALRCharacter* Player)
 
 float ALRContainer::GetInteractionDuration() const
 {
-	// 한 번 수색된 상자는 0을 반환해 반응 없게 만듦
 	return bSearched ? 0.f : SearchDuration;
+}
+
+FText ALRContainer::GetInteractionPrompt() const
+{
+	return bSearched ? FText::FromString(TEXT("이미 수색함")) : FText::FromString(TEXT("[E] 수색하기"));
+}
+
+FText ALRContainer::GetProgressText() const
+{
+	return FText::FromString(TEXT("수색 중..."));
+}
+
+FText ALRContainer::GetStartText() const
+{
+	return FText::FromString(TEXT("수색 시작..."));
+}
+
+FText ALRContainer::GetCancelText() const
+{
+	return FText::FromString(TEXT("수색이 취소되었습니다."));
 }

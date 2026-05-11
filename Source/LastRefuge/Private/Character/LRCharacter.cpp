@@ -11,7 +11,8 @@
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISense_Hearing.h"
-#include "LRGameMode.h" 
+#include "LRGameMode.h"
+#include "LRGameInstance.h"
 #include "Components/LRInventoryComponent.h"
 #include "Items/LRItemDataAsset.h"
 #include "Interfaces/LRInteractable.h"
@@ -56,6 +57,19 @@ void ALRCharacter::BeginPlay()
     if (InventoryComponent)
     {
         UE_LOG(LogTemp, Log, TEXT("Inventory System Initialized."));
+
+        // 레벨 이동 후 인벤토리 복원
+        if (ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance()))
+        {
+            if (GI->bHasTravelData)
+            {
+                for (const FLRItemSlot& Slot : GI->PersistentInventory)
+                {
+                    if (!Slot.IsEmpty())
+                        InventoryComponent->AddItem(Slot.ItemData, Slot.Quantity);
+                }
+            }
+        }
     }
 
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -280,6 +294,27 @@ void ALRCharacter::Tick(float DeltaTime)
     GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::Yellow, FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
     GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red, FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
     
+    // --- 상호작용 프롬프트 (조준 중인 오브젝트 표시) ---
+    if (!bIsSearching && Controller)
+    {
+        FVector Start;
+        FRotator Rotation;
+        Controller->GetPlayerViewPoint(Start, Rotation);
+        FVector End = Start + Rotation.Vector() * 200.f;
+
+        FHitResult Hit;
+        FCollisionQueryParams Params;
+        Params.AddIgnoredActor(this);
+
+        if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+        {
+            if (ILRInteractable* Target = Cast<ILRInteractable>(Hit.GetActor()))
+            {
+                GEngine->AddOnScreenDebugMessage(20, 0.f, FColor::White, Target->GetInteractionPrompt().ToString());
+            }
+        }
+    }
+
     // --- 수색 게이지 로직 추가 ---
     if (bIsSearching && CurrentInteractable)
     {
@@ -287,7 +322,11 @@ void ALRCharacter::Tick(float DeltaTime)
         
         // (임시 UI) 화면에 0~100% 진행률 표시
         float Progress = CurrentSearchTime / SearchDuration;
-        GEngine->AddOnScreenDebugMessage(10, 0.f, FColor::Green, FString::Printf(TEXT("수색 중... %d%%"), FMath::FloorToInt(Progress * 100)));
+        ILRInteractable* ProgressTarget = Cast<ILRInteractable>(CurrentInteractable);
+        FString ProgressMsg = ProgressTarget
+            ? FString::Printf(TEXT("%s %d%%"), *ProgressTarget->GetProgressText().ToString(), FMath::FloorToInt(Progress * 100))
+            : FString::Printf(TEXT("%d%%"), FMath::FloorToInt(Progress * 100));
+        GEngine->AddOnScreenDebugMessage(10, 0.f, FColor::Green, ProgressMsg);
 
         // 3초 도달 시 완료 처리
         if (CurrentSearchTime >= SearchDuration)
@@ -313,6 +352,7 @@ float ALRCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
     const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
     if (StatusComponent && Applied > 0.f)
     {
+        CancelSearch();
         StatusComponent->ApplyDamage(Applied);
     }
     return Applied;
@@ -360,7 +400,7 @@ void ALRCharacter::TryInteract()
                 bIsSearching = true;
                 CurrentSearchTime = 0.f;
                 InteractableTarget->BeginInteract(this);
-                GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("수색 시작..."));
+                GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, InteractableTarget->GetStartText().ToString());
             }
             else
             {
@@ -386,6 +426,10 @@ void ALRCharacter::CancelSearch()
         CurrentSearchTime = 0.f;
         CurrentInteractable = nullptr;
         
-        GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("수색이 취소되었습니다."));
+        ILRInteractable* CancelTarget = Cast<ILRInteractable>(CurrentInteractable);
+        if (CancelTarget)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, CancelTarget->GetCancelText().ToString());
+        }
     }
 }
