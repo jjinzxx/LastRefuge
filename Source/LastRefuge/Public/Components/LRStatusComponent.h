@@ -27,6 +27,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "Status")
     float GetHealthPercent() const { return Health / MaxHealth; }
+    
+    UFUNCTION(BlueprintCallable, Category = "LR|Status")
+    void RestoreHealth(float Amount);
 
     // === 스테미나 ===
     UFUNCTION(BlueprintCallable, Category = "Status")
@@ -46,7 +49,7 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "Status")
     bool IsStaminaEmpty() const { return Stamina <= 0.f; }
-
+    
     // === 델리게이트 ===
     UPROPERTY(BlueprintAssignable, Category = "Status")
     FOnHealthChanged OnHealthChanged;

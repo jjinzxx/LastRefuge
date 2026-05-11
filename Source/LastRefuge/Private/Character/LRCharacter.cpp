@@ -1,5 +1,4 @@
 #include "Character/LRCharacter.h"
-
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
@@ -15,6 +14,7 @@
 #include "LRGameMode.h" 
 #include "Components/LRInventoryComponent.h"
 #include "Items/LRItemDataAsset.h"
+#include "Interfaces/LRInteractable.h"
 
 ALRCharacter::ALRCharacter()
 {
@@ -53,15 +53,10 @@ void ALRCharacter::BeginPlay()
 {
     Super::BeginPlay();
     
-    // 인벤토리 컴포넌트가 있는지 확인
     if (InventoryComponent)
     {
         UE_LOG(LogTemp, Log, TEXT("Inventory System Initialized."));
-        
-        // 여기에 에디터에서 생성한 DataAsset을 블루프린트로 전달받아 
-        // AddItem을 호출해보면 로그로 성공 여부를 알 수 있습니다.
     }
-    
 
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {
@@ -103,6 +98,12 @@ void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
             EIC->BindAction(SprintAction, ETriggerEvent::Started, this, &ALRCharacter::StartSprint);
             EIC->BindAction(SprintAction, ETriggerEvent::Completed, this, &ALRCharacter::StopSprint);
         }
+
+        // 상호작용 (E키 바인딩) - 에디터에서 IA_Interact 할당 필요
+        if (IA_Interact)
+        {
+            EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &ALRCharacter::TryInteract);
+        }
     }
 }
 
@@ -142,6 +143,11 @@ void ALRCharacter::Move(const FInputActionValue& Value)
     const FVector2D MovementVector = Value.Get<FVector2D>();
     if (Controller && !MovementVector.IsZero())
     {
+        // 수색 중에 움직이려고 하면 즉시 수색 취소
+        if (bIsSearching) 
+        {
+            CancelSearch();
+        }
         const FRotator YawRotation(0, Controller->GetControlRotation().Yaw, 0);
         const FVector ForwardDir = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
         const FVector RightDir = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
@@ -163,6 +169,10 @@ void ALRCharacter::Look(const FInputActionValue& Value)
 
 void ALRCharacter::StartJump(const FInputActionValue& Value)
 {
+    if (bIsSearching) 
+    {
+        CancelSearch();
+    }
     Jump();
 }
 
@@ -181,7 +191,6 @@ void ALRCharacter::ToggleCrouch(const FInputActionValue& Value)
 
 void ALRCharacter::StartSprint(const FInputActionValue& Value)
 {
-    // 앉은 상태에서는 달리기 불가
     if (MovementState != ELRMovementState::Crouching)
         SetMovementState(ELRMovementState::Running);
 }
@@ -196,7 +205,6 @@ void ALRCharacter::ReportMovementNoise()
 {
     if (!StatusComponent) return;
 
-    // 실제로 이동 중일 때만 소음 발생
     const float CurrentSpeed = GetVelocity().Size2D();
     if (CurrentSpeed < 10.f) return;
 
@@ -230,66 +238,73 @@ void ALRCharacter::Tick(float DeltaTime)
     float NewHalfHeight = FMath::FInterpTo(CurrentHalfHeight, TargetCapsuleHalfHeight, DeltaTime, CrouchInterpSpeed);
     Capsule->SetCapsuleHalfHeight(NewHalfHeight);
 
-    // 캡슐이 줄어들 때 캐릭터가 바닥에 붙어있도록 메쉬 오프셋 조정
+    // 캡슐 오프셋 조정
     FVector MeshLocation = GetMesh()->GetRelativeLocation();
     MeshLocation.Z = -NewHalfHeight;
     GetMesh()->SetRelativeLocation(MeshLocation);
     
-    // 달리는 중이면 스테미나 소모
     if (MovementState == ELRMovementState::Running)
     {
         StatusComponent->ConsumeStamina(StatusComponent->GetStaminaDrainRate() * DeltaTime);
 
-        // 스테미나 바닥나면 강제로 걷기 전환
         if (StatusComponent->IsStaminaEmpty())
         {
             SetMovementState(ELRMovementState::Walking);
         }
     }
-    // MakeNoise (AI 청각 감지용)
+
+    // 소음 보고
     NoiseMakeTimer += DeltaTime;
     if (!GetVelocity().IsZero() && NoiseMakeTimer >= 0.2f)
     {
         NoiseMakeTimer = 0.f;
         ReportMovementNoise();
     }
-    // 소음 반경 시각화 - 나중에 비활성화
+
+    // 소음 시각화 및 디버그
     if (StatusComponent->GetNoiseRadius() > 0.f)
     {
         FColor SphereColor;
         switch (MovementState)
         {
-        case ELRMovementState::Crouching:
-            SphereColor = FColor::Green;
-            break;
-        case ELRMovementState::Walking:
-            SphereColor = FColor::Yellow;
-            break;
-        case ELRMovementState::Running:
-            SphereColor = FColor::Red;
-            break;
-        default:
-            SphereColor = FColor::White;
+        case ELRMovementState::Crouching: SphereColor = FColor::Green; break;
+        case ELRMovementState::Walking: SphereColor = FColor::Yellow; break;
+        case ELRMovementState::Running: SphereColor = FColor::Red; break;
+        default: SphereColor = FColor::White;
         }
 
-        DrawDebugSphere(
-            GetWorld(),
-            GetActorLocation(),
-            StatusComponent->GetNoiseRadius(),
-            16,
-            SphereColor,
-            false,
-            -1.f
-        );
+        DrawDebugSphere(GetWorld(), GetActorLocation(), StatusComponent->GetNoiseRadius(), 16, SphereColor, false, -1.f);
     }
 
-    // 소음 반경 디버그 수치 출력
-    GEngine->AddOnScreenDebugMessage(2, 0.f, FColor::Cyan,
-        FString::Printf(TEXT("Noise Radius: %.0f"), StatusComponent->GetNoiseRadius()));
-    GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::Yellow,
-        FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
-    GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red,
-        FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
+    GEngine->AddOnScreenDebugMessage(2, 0.f, FColor::Cyan, FString::Printf(TEXT("Noise Radius: %.0f"), StatusComponent->GetNoiseRadius()));
+    GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::Yellow, FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
+    GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red, FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
+    
+    // --- 수색 게이지 로직 추가 ---
+    if (bIsSearching && CurrentInteractable)
+    {
+        CurrentSearchTime += DeltaTime;
+        
+        // (임시 UI) 화면에 0~100% 진행률 표시
+        float Progress = CurrentSearchTime / SearchDuration;
+        GEngine->AddOnScreenDebugMessage(10, 0.f, FColor::Green, FString::Printf(TEXT("수색 중... %d%%"), FMath::FloorToInt(Progress * 100)));
+
+        // 3초 도달 시 완료 처리
+        if (CurrentSearchTime >= SearchDuration)
+        {
+            ILRInteractable* InteractableTarget = Cast<ILRInteractable>(CurrentInteractable);
+            if (InteractableTarget)
+            {
+                InteractableTarget->EndInteract(this); // 상자에게 완료되었다고 알림
+            }
+            
+            bIsSearching = false;
+            CurrentSearchTime = 0.f;
+            CurrentInteractable = nullptr;
+            
+            GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Cyan, TEXT("수색 완료!"));
+        }
+    }
 }
 
 float ALRCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
@@ -313,5 +328,64 @@ void ALRCharacter::OnHealthChanged(float NewHealth, float MaxHealth)
         {
             GM->OnPlayerDied(GetController());
         }
+    }
+}
+
+void ALRCharacter::TryInteract()
+{
+    if (bIsSearching) return;
+    if (Controller == nullptr) return;
+
+    FVector Start;
+    FRotator Rotation;
+    Controller->GetPlayerViewPoint(Start, Rotation);
+
+    FVector End = Start + (Rotation.Vector() * 200.0f); // 200 거리 탐색
+
+    FHitResult HitResult;
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this); 
+
+    if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, Params))
+    {
+        AActor* HitActor = HitResult.GetActor();
+        ILRInteractable* InteractableTarget = Cast<ILRInteractable>(HitActor);
+        if (InteractableTarget)
+        {
+            CurrentInteractable = HitActor;
+            SearchDuration = InteractableTarget->GetInteractionDuration();
+
+            if (SearchDuration > 0.f)
+            {
+                bIsSearching = true;
+                CurrentSearchTime = 0.f;
+                InteractableTarget->BeginInteract(this);
+                GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, TEXT("수색 시작..."));
+            }
+            else
+            {
+                InteractableTarget->BeginInteract(this);
+                InteractableTarget->EndInteract(this);
+                CurrentInteractable = nullptr;
+            }
+        }
+    }
+}
+
+void ALRCharacter::CancelSearch()
+{
+    if (bIsSearching && CurrentInteractable)
+    {
+        ILRInteractable* InteractableTarget = Cast<ILRInteractable>(CurrentInteractable);
+        if (InteractableTarget)
+        {
+            InteractableTarget->EndInteract(nullptr); 
+        }
+        
+        bIsSearching = false;
+        CurrentSearchTime = 0.f;
+        CurrentInteractable = nullptr;
+        
+        GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("수색이 취소되었습니다."));
     }
 }

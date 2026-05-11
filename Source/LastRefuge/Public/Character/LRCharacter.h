@@ -125,4 +125,23 @@ protected:
     
     // === 현재 이동 상태에 따른 청각 자극을 AIPerception 시스템에 보고 ===
     void ReportMovementNoise();
+    
+    /** 상호작용(E키) 입력 액션 */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* IA_Interact;
+
+    /** 상호작용 시도 (LineTrace) */
+    void TryInteract();
+
+    /** 수색 중단 (인터럽트) */
+    void CancelSearch();
+
+    // --- 수색 게이지 관련 상태 변수 ---
+    bool bIsSearching = false;
+    float CurrentSearchTime = 0.f;
+    float SearchDuration = 0.f;
+
+    // 현재 상호작용 중인 대상 기억
+    UPROPERTY()
+    AActor* CurrentInteractable;
 };

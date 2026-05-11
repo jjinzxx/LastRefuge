@@ -36,4 +36,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Data")
 	int32 MaxStackSize;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|Effect")
+	float HealthRestore; // 체력 회복량
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|Effect")
+	float StaminaRestore; // 스테미나 회복량
 };

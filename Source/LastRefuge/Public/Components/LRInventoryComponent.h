@@ -24,6 +24,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnInventoryUpdated OnInventoryUpdated;
+    
+	// 슬롯 인덱스를 받아 아이템 효과를 적용하고 수량을 차감합니다.
+	UFUNCTION(BlueprintCallable, Category = "LR|Inventory")
+	bool UseItem(int32 SlotIndex);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
@@ -31,4 +35,8 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TArray<FLRItemSlot> InventorySlots;
+    
+private:
+	/** 실제 아이템 효과를 캐릭터에게 전달하는 내부 보조 함수 */
+	void ApplyItemEffects(const class ULRItemDataAsset* ItemData);
 };
