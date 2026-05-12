@@ -89,16 +89,16 @@ protected:
 	TObjectPtr<UAIPerceptionComponent> PerceptionComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Perception|Sight")
-	float SightRadius = 1500.f;
+	float SightRadius = 1200.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Perception|Sight")
-	float LoseSightRadius = 2500.f;
+	float LoseSightRadius = 1800.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Perception|Sight")
 	float PeripheralVisionHalfAngleDegrees = 45.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Perception|Hearing")
-	float HearingRange = 2000.f;
+	float HearingRange = 1800.f;
 	
 	
 };

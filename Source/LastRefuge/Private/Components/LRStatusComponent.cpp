@@ -63,16 +63,12 @@ void ULRStatusComponent::UpdateNoiseRadius(float NewRadius)
 
 void ULRStatusComponent::RestoreHealth(float Amount)
 {
-	// 현재 체력에 회복량을 더하되, 0 ~ MaxHealth 사이로 고정
 	Health = FMath::Clamp(Health + Amount, 0.f, MaxHealth);
-    
-	UE_LOG(LogTemp, Log, TEXT("Health Restored! Current Health: %f"), Health);
+	OnHealthChanged.Broadcast(Health, MaxHealth);
 }
 
 void ULRStatusComponent::RestoreStamina(float Amount)
 {
-	// 현재 스테미나에 회복량을 더하되, 0 ~ MaxStamina 사이로 고정
 	Stamina = FMath::Clamp(Stamina + Amount, 0.f, MaxStamina);
-
-	UE_LOG(LogTemp, Log, TEXT("Stamina Restored! Current Stamina: %f"), Stamina);
+	OnStaminaChanged.Broadcast(Stamina, MaxStamina);
 }

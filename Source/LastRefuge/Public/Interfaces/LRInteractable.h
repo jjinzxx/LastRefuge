@@ -35,4 +35,7 @@ public:
 
 	/** 상호작용 취소 시 표시할 텍스트 */
 	virtual FText GetCancelText() const = 0;
+
+	/** 상호작용 완료 시 표시할 텍스트 */
+	virtual FText GetCompleteText() const = 0;
 };

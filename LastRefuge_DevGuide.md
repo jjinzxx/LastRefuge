@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 11 진행 중)
+# Last Refuge - 개발 인수인계 문서 (Day 12 완료)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -34,7 +34,8 @@
 ```text
 Content/
 └── LR/
-    ├── Blueprints/      # BP_LRCharacter, BP_LRBot, BP_LRGameMode, BP_LRContainer (Day 9), BP_LRStorage (Day 10)
+    ├── Blueprints/      # BP_LRCharacter, BP_LRBot, BP_LRGameMode, BP_LRContainer (Day 9), BP_LRStorage (Day 10), BP_LRDoor (Day 11)
+    ├── UI/              # WBP_LRHud (Day 12)
     ├── Characters/
     ├── DataAssets/      # 아이템 데이터 에셋
     ├── Input/           # IMC_Default, IA_Move, IA_Look, IA_Jump, IA_Crouch, IA_Sprint, IA_Interact (Day 9)
@@ -47,8 +48,9 @@ Source/LastRefuge/
 │   ├── Character/       # LRCharacter.h
 │   ├── AI/              # LRBot.h, LRBotAIController.h, BTTask_LRSelectNextPatrolPoint.h, BTTask_LRSuspiciousScan.h
 │   ├── Components/      # LRStatusComponent.h, LRInventoryComponent.h
-│   ├── Interfaces/      # LRInteractable.h (GetInteractionPrompt 추가 Day 11)
-│   └── Items/           # LRItemDataAsset.h, LRInventoryStructs.h, LRContainer.h (Day 9), LRStorage.h (Day 10)
+│   ├── Interfaces/      # LRInteractable.h (GetInteractionPrompt, GetProgressText, GetStartText, GetCancelText, GetCompleteText)
+│   ├── Items/           # LRItemDataAsset.h, LRInventoryStructs.h, LRContainer.h (Day 9), LRStorage.h (Day 10), LRDoor.h (Day 11)
+│   └── UI/              # LRHudWidget.h (Day 12)
 └── Private/
     └── (동일 구조)
 ```

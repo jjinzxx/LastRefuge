@@ -60,12 +60,12 @@ float ALRContainer::GetInteractionDuration() const
 
 FText ALRContainer::GetInteractionPrompt() const
 {
-	return bSearched ? FText::FromString(TEXT("이미 수색함")) : FText::FromString(TEXT("[E] 수색하기"));
+	return bSearched ? FText::FromString(TEXT("이미 수색함")) : FText::FromString(TEXT("[E] 열기"));
 }
 
 FText ALRContainer::GetProgressText() const
 {
-	return FText::FromString(TEXT("수색 중..."));
+	return FText::FromString(TEXT("수색중"));
 }
 
 FText ALRContainer::GetStartText() const
@@ -76,4 +76,9 @@ FText ALRContainer::GetStartText() const
 FText ALRContainer::GetCancelText() const
 {
 	return FText::FromString(TEXT("수색이 취소되었습니다."));
+}
+
+FText ALRContainer::GetCompleteText() const
+{
+	return FText::FromString(TEXT("수색완료"));
 }

@@ -82,7 +82,7 @@ FText ALRDoor::GetInteractionPrompt() const
 
 FText ALRDoor::GetProgressText() const
 {
-	return FText::FromString(TEXT("이동 대기중..."));
+	return FText::FromString(TEXT("이동중"));
 }
 
 FText ALRDoor::GetStartText() const
@@ -93,4 +93,9 @@ FText ALRDoor::GetStartText() const
 FText ALRDoor::GetCancelText() const
 {
 	return FText::FromString(TEXT("이동이 취소되었습니다."));
+}
+
+FText ALRDoor::GetCompleteText() const
+{
+	return FText::FromString(TEXT("이동완료"));
 }
