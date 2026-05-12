@@ -22,6 +22,7 @@ public:
 	virtual FText GetProgressText() const override;
 	virtual FText GetStartText() const override;
 	virtual FText GetCancelText() const override;
+	virtual FText GetCompleteText() const override;
 
 	UFUNCTION(BlueprintPure, Category = "LR|Storage")
 	const TArray<FLRItemSlot>& GetStoredItems() const { return StoredItems; }

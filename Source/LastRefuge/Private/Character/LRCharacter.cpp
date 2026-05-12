@@ -14,6 +14,8 @@
 #include "LRGameMode.h"
 #include "LRGameInstance.h"
 #include "Components/LRInventoryComponent.h"
+#include "UI/LRHudWidget.h"
+#include "Blueprint/UserWidget.h"
 #include "Items/LRItemDataAsset.h"
 #include "Interfaces/LRInteractable.h"
 
@@ -85,6 +87,16 @@ void ALRCharacter::BeginPlay()
     }
     
     StatusComponent->OnHealthChanged.AddDynamic(this, &ALRCharacter::OnHealthChanged);
+
+    // HUD 생성 (로컬 플레이어만)
+    if (IsLocallyControlled() && HudWidgetClass)
+    {
+        ULRHudWidget* HudWidget = CreateWidget<ULRHudWidget>(GetWorld(), HudWidgetClass);
+        if (HudWidget)
+        {
+            HudWidget->AddToViewport();
+        }
+    }
 }
 
 void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -275,24 +287,22 @@ void ALRCharacter::Tick(float DeltaTime)
         ReportMovementNoise();
     }
 
-    // 소음 시각화 및 디버그
-    if (StatusComponent->GetNoiseRadius() > 0.f)
-    {
-        FColor SphereColor;
-        switch (MovementState)
-        {
-        case ELRMovementState::Crouching: SphereColor = FColor::Green; break;
-        case ELRMovementState::Walking: SphereColor = FColor::Yellow; break;
-        case ELRMovementState::Running: SphereColor = FColor::Red; break;
-        default: SphereColor = FColor::White;
-        }
-
-        DrawDebugSphere(GetWorld(), GetActorLocation(), StatusComponent->GetNoiseRadius(), 16, SphereColor, false, -1.f);
-    }
-
-    GEngine->AddOnScreenDebugMessage(2, 0.f, FColor::Cyan, FString::Printf(TEXT("Noise Radius: %.0f"), StatusComponent->GetNoiseRadius()));
-    GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::Yellow, FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
-    GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red, FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
+    // // 소음 시각화 디버그 (비활성화)
+    // if (StatusComponent->GetNoiseRadius() > 0.f)
+    // {
+    //     FColor SphereColor;
+    //     switch (MovementState)
+    //     {
+    //     case ELRMovementState::Crouching: SphereColor = FColor::Green; break;
+    //     case ELRMovementState::Walking: SphereColor = FColor::Yellow; break;
+    //     case ELRMovementState::Running: SphereColor = FColor::Red; break;
+    //     default: SphereColor = FColor::White;
+    //     }
+    //     DrawDebugSphere(GetWorld(), GetActorLocation(), StatusComponent->GetNoiseRadius(), 16, SphereColor, false, -1.f);
+    // }
+    // GEngine->AddOnScreenDebugMessage(2, 0.f, FColor::Cyan, FString::Printf(TEXT("Noise Radius: %.0f"), StatusComponent->GetNoiseRadius()));
+    // GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::Yellow, FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
+    // GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red, FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
     
     // --- 상호작용 프롬프트 (조준 중인 오브젝트 표시) ---
     if (!bIsSearching && Controller)
@@ -306,13 +316,23 @@ void ALRCharacter::Tick(float DeltaTime)
         FCollisionQueryParams Params;
         Params.AddIgnoredActor(this);
 
+        FText NewPrompt = FText::GetEmpty();
         if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
         {
             if (ILRInteractable* Target = Cast<ILRInteractable>(Hit.GetActor()))
             {
-                GEngine->AddOnScreenDebugMessage(20, 0.f, FColor::White, Target->GetInteractionPrompt().ToString());
+                NewPrompt = Target->GetInteractionPrompt();
             }
         }
+
+        // 프롬프트가 바뀔 때만 브로드캐스트 (매 프레임 불필요한 UI 갱신 방지)
+        if (!NewPrompt.EqualTo(CurrentPromptText))
+        {
+            CurrentPromptText = NewPrompt;
+            OnInteractionPromptChanged.Broadcast(CurrentPromptText);
+        }
+
+        // GEngine->AddOnScreenDebugMessage(20, 0.f, FColor::White, CurrentPromptText.ToString());
     }
 
     // --- 수색 게이지 로직 추가 ---
@@ -320,28 +340,36 @@ void ALRCharacter::Tick(float DeltaTime)
     {
         CurrentSearchTime += DeltaTime;
         
-        // (임시 UI) 화면에 0~100% 진행률 표시
+        // 진행률 계산 및 브로드캐스트
         float Progress = CurrentSearchTime / SearchDuration;
-        ILRInteractable* ProgressTarget = Cast<ILRInteractable>(CurrentInteractable);
-        FString ProgressMsg = ProgressTarget
-            ? FString::Printf(TEXT("%s %d%%"), *ProgressTarget->GetProgressText().ToString(), FMath::FloorToInt(Progress * 100))
-            : FString::Printf(TEXT("%d%%"), FMath::FloorToInt(Progress * 100));
-        GEngine->AddOnScreenDebugMessage(10, 0.f, FColor::Green, ProgressMsg);
+        OnSearchProgressChanged.Broadcast(Progress);
 
-        // 3초 도달 시 완료 처리
+        // // (임시 디버그) 화면에 진행률 표시 (비활성화)
+        // ILRInteractable* ProgressTarget = Cast<ILRInteractable>(CurrentInteractable);
+        // FString ProgressMsg = ProgressTarget
+        //     ? FString::Printf(TEXT("%s %d%%"), *ProgressTarget->GetProgressText().ToString(), FMath::FloorToInt(Progress * 100))
+        //     : FString::Printf(TEXT("%d%%"), FMath::FloorToInt(Progress * 100));
+        // GEngine->AddOnScreenDebugMessage(10, 0.f, FColor::Green, ProgressMsg);
+
+        // 완료 처리
         if (CurrentSearchTime >= SearchDuration)
         {
             ILRInteractable* InteractableTarget = Cast<ILRInteractable>(CurrentInteractable);
+            FText CompleteText = InteractableTarget
+                ? InteractableTarget->GetCompleteText()
+                : FText::GetEmpty();
+
             if (InteractableTarget)
             {
-                InteractableTarget->EndInteract(this); // 상자에게 완료되었다고 알림
+                InteractableTarget->EndInteract(this);
             }
-            
+
             bIsSearching = false;
             CurrentSearchTime = 0.f;
             CurrentInteractable = nullptr;
-            
-            GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Cyan, TEXT("수색 완료!"));
+
+            OnSearchEnded.Broadcast(true, CompleteText);
+            // GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Cyan, TEXT("완료!"));
         }
     }
 }
@@ -400,7 +428,7 @@ void ALRCharacter::TryInteract()
                 bIsSearching = true;
                 CurrentSearchTime = 0.f;
                 InteractableTarget->BeginInteract(this);
-                GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, InteractableTarget->GetStartText().ToString());
+                OnSearchStarted.Broadcast(InteractableTarget->GetProgressText());
             }
             else
             {
@@ -417,19 +445,21 @@ void ALRCharacter::CancelSearch()
     if (bIsSearching && CurrentInteractable)
     {
         ILRInteractable* InteractableTarget = Cast<ILRInteractable>(CurrentInteractable);
+
+        // 취소 텍스트를 nullptr 처리 전에 미리 가져옴
+        FText CancelText = InteractableTarget
+            ? InteractableTarget->GetCancelText()
+            : FText::GetEmpty();
+
         if (InteractableTarget)
         {
-            InteractableTarget->EndInteract(nullptr); 
+            InteractableTarget->EndInteract(nullptr);
         }
-        
+
         bIsSearching = false;
         CurrentSearchTime = 0.f;
         CurrentInteractable = nullptr;
-        
-        ILRInteractable* CancelTarget = Cast<ILRInteractable>(CurrentInteractable);
-        if (CancelTarget)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, CancelTarget->GetCancelText().ToString());
-        }
+
+        OnSearchEnded.Broadcast(false, CancelText);
     }
 }

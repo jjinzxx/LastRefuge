@@ -11,6 +11,7 @@ class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
 class ULRInventoryComponent;
+class ULRHudWidget;
 
 UENUM(BlueprintType)
 enum class ELRMovementState : uint8
@@ -19,6 +20,15 @@ enum class ELRMovementState : uint8
     Walking,
     Running
 };
+
+// 수색/이동 게이지 진행률 (0.0 ~ 1.0)
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSearchProgressChanged, float, Progress);
+// 수색/이동 시작 — 베이스 텍스트 전달 ("수색중", "이동중" 등)
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSearchStarted, FText, ProgressBaseText);
+// 수색/이동 종료 — bCompleted: true=완료, false=취소 / StatusText: 취소 시 표시할 텍스트
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSearchEnded, bool, bCompleted, FText, StatusText);
+// 조준 중인 오브젝트의 프롬프트 텍스트 변경 (비어있으면 프롬프트 숨김)
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractionPromptChanged, FText, Prompt);
 
 UCLASS()
 class LASTREFUGE_API ALRCharacter : public ACharacter
@@ -36,6 +46,23 @@ private:
 
 public:
     ALRCharacter();
+
+    // === HUD ===
+    UPROPERTY(EditDefaultsOnly, Category = "UI")
+    TSubclassOf<ULRHudWidget> HudWidgetClass;
+
+    // === UI 델리게이트 ===
+    UPROPERTY(BlueprintAssignable, Category = "LR|UI")
+    FOnSearchProgressChanged OnSearchProgressChanged;
+
+    UPROPERTY(BlueprintAssignable, Category = "LR|UI")
+    FOnSearchStarted OnSearchStarted;
+
+    UPROPERTY(BlueprintAssignable, Category = "LR|UI")
+    FOnSearchEnded OnSearchEnded;
+
+    UPROPERTY(BlueprintAssignable, Category = "LR|UI")
+    FOnInteractionPromptChanged OnInteractionPromptChanged;
 
     UFUNCTION(BlueprintPure, Category = "Movement")
     ELRMovementState GetMovementState() const { return MovementState; }
@@ -144,4 +171,7 @@ protected:
     // 현재 상호작용 중인 대상 기억
     UPROPERTY()
     AActor* CurrentInteractable;
+
+    // 현재 표시 중인 프롬프트 (변경 감지용)
+    FText CurrentPromptText;
 };
