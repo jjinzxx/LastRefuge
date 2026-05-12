@@ -99,3 +99,8 @@ FText ALRStorage::GetCompleteText() const
 {
 	return FText::GetEmpty();
 }
+
+FText ALRStorage::GetCompleteText() const
+{
+	return FText::GetEmpty();
+}

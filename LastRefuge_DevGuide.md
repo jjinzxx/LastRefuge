@@ -68,20 +68,31 @@ Source/LastRefuge/
 - **[Day 9]** 이동, 점프 시 수색 인터럽트 처리 (`CancelSearch`)
 - **[Day 10]** 피격 시 수색 인터럽트 (`TakeDamage`에서 `CancelSearch` 호출)
 - **[Day 11]** Tick에서 조준 중인 `ILRInteractable`의 프롬프트 텍스트를 화면에 표시
+- **[Day 12]** `OnSearchStarted` / `OnSearchEnded` / `OnSearchProgressChanged` / `OnInteractionPromptChanged` 델리게이트 추가 및 브로드캐스트
+- **[Day 12]** 완료 시 `GetCompleteText()`, 취소 시 `GetCancelText()` 오브젝트별 텍스트 전달
+
+### ULRHudWidget (UI/LRHudWidget.h/.cpp) — Day 12 신규
+- `UUserWidget` 기반 C++ HUD 클래스. `WBP_LRHud`의 부모 클래스로 지정.
+- **BindWidget**: `PB_HP`, `PB_Stamina`, `PB_Noise`, `TB_Prompt` (필수 바인딩)
+- **BindWidgetOptional**: `PB_Search` (텍스트 애니메이션으로 대체되어 블루프린트에서 제거)
+- `NativeTick`에서 노이즈 바 폴링 + 점 애니메이션 (`수색중.` / `수색중..` / `수색중...`) 0.4초 간격
+- 완료 시 오브젝트별 텍스트 표시 (`수색완료` / `이동완료`), 2초 후 자동 숨김
+- 취소 시 오브젝트별 텍스트 표시 (`수색이 취소되었습니다.` / `이동이 취소되었습니다.`)
 
 ### ULRInventoryComponent & 아이템 시스템 (Day 8 완비)
 - `ULRItemDataAsset`: 아이템 정보(Resource, Consumable 등), 회복 수치 관리.
 - `AddItem` / `RemoveItem`: 수량 기반 중첩 및 배열 관리.
-- `UseItem` + `ApplyItemEffects`: 소모품 사용 및 스탯 회복 (구현 완료, UI 연결은 Day 12).
+- `UseItem` + `ApplyItemEffects`: 소모품 사용 및 스탯 회복 (구현 완료).
 - **[Day 10]** `GetInventorySlots()` / `ClearInventory()` 추가.
 
-### 상호작용 시스템 (Day 9 완비)
-- **`ILRInteractable`**: `BeginInteract`, `EndInteract`, `GetInteractionDuration`, **[Day 11] `GetInteractionPrompt()`** 추가.
-- **`ALRContainer`**: 인터페이스를 상속받은 컨테이너 액터. 수색 완료 시 `LootTable` 아이템을 인벤에 지급. `bSearched` 플래그로 재수색 방지. 프롬프트: `[E] 수색하기` / `이미 수색함`.
+### 상호작용 시스템 (Day 12 완비)
+- **`ILRInteractable`**: `BeginInteract`, `EndInteract`, `GetInteractionDuration`, `GetInteractionPrompt`, `GetProgressText`, `GetStartText`, `GetCancelText`, **[Day 12] `GetCompleteText()`** 추가.
+- **`ALRContainer`**: 수색 완료 시 `LootTable` 아이템 지급. `bSearched` 플래그로 재수색 방지. 프롬프트: `[E] 열기` / `이미 수색함`. 완료 텍스트: `수색완료`.
+- **`ALRDoor`**: 레벨 이동 액터. `InteractionDuration=5초`, `TargetLevel` 설정. 이동 전 인벤토리/보관함 GameInstance에 저장. 완료 텍스트: `이동완료`.
 
 ### 보관함 및 사망 처리 (Day 10 완비)
-- **`ALRStorage`**: 기지 보관함 액터. `ILRInteractable` 구현, 즉시 상호작용(duration=0). 아이템 있으면 **Deposit**, 없으면 **Withdraw**. 사망 후에도 `StoredItems` 유지. 프롬프트: `[E] 저장하기` / `[E] 꺼내기`.
-- **사망 처리**: 새 폰 스폰 시 인벤토리 자동 초기화. 피격 수색 인터럽트 완료.
+- **`ALRStorage`**: 기지 보관함 액터. `ILRInteractable` 구현, 즉시 상호작용(duration=0). 아이템 있으면 **Deposit**, 없으면 **Withdraw**. `BeginPlay`에서 `GameInstance`로부터 보관함 복원. 프롬프트: `[E] 저장하기` / `[E] 꺼내기`.
+- **사망 처리**: `ALRGameMode::RespawnLevelName` 설정 시 해당 레벨로 이동(인벤 초기화), 미설정 시 제자리 리스폰.
 
 ### AI 시스템 (Day 6 완비)
 - 감지(Perception), 순찰(Patrol), 의심(Suspicious), 전투(Combat) 상태 머신 완료.
@@ -97,8 +108,8 @@ Source/LastRefuge/
 | Day 8 | 인벤토리 시스템 + 아이템 데이터 에셋 | ✅ 완료 |
 | Day 9 | 컨테이너 + 수색 게이지 + 인터럽트 로직 | ✅ 완료 |
 | Day 10 | 아이템 사용(스탯 회복) 구현 + 보관함 + 사망 처리 | ✅ 완료 |
-| Day 11 | **Day 10 검증 완료 + GetInteractionPrompt + 맵 블록아웃** | 🔄 진행 중 |
-| Day 12 | **UI 시스템 (Minimum Viable HUD)** | ⬜ 미완료 |
+| Day 11 | **GetInteractionPrompt + 레벨 전환(ALRDoor) + GameInstance 인벤/보관함 영속** | ✅ 완료 |
+| Day 12 | **Minimum Viable HUD (ULRHudWidget, 점 애니메이션, 완료/취소 텍스트)** | ✅ 완료 |
 | Day 13 | **밸런싱 (60%) + 사운드 (30%) + 사전 빌드 (10%)** | ⬜ 미완료 |
 | Day 14 | **최종 빌드 + QA + 시연 영상** | ⬜ 미완료 |
 
@@ -113,39 +124,28 @@ Source/LastRefuge/
 
 ---
 
-## Day 11 — 맵 레벨 디자인 (Playable Map)
+## Day 11 — 레벨 전환 + 인터페이스 확장 (완료)
 
-**완료된 C++ 작업:**
-- `ILRInteractable::GetInteractionPrompt()` 인터페이스 추가
-- `ALRContainer` / `ALRStorage` 각각 프롬프트 구현
-- `ALRCharacter` Tick에서 조준 오브젝트 프롬프트 화면 표시 (디버그 채널 20번)
-
-**에디터 작업 체크리스트 (목표: 한 사이클 완주):**
-- ⬜ `L_Day11_Blockout` 맵 생성
-- ⬜ 3구역 BSP 블록아웃 (기지 SafeZone / 중간 위험지대 / 폐허 고위험지대)
-- ⬜ NavMesh 배치 + AI 2마리 + Patrol Waypoint 2~3개 (교차점 1개)
-- ⬜ 컨테이너 3~5개 배치 (입구=Scrap, 안쪽=Medkit/Ration)
-- ⬜ 보관함 1개 기지에 배치
-- ⬜ 통합 플레이 1회 (출발 → AI 회피 → 컨테이너 2개 수색 → 귀환 → 저장)
-
-> ⚠️ **6시간 룰**: 블록아웃이 6시간을 넘으면 분위기·디테일은 포기하고 Day 13으로 미룬다.
+- `ILRInteractable`에 `GetInteractionPrompt`, `GetProgressText`, `GetStartText`, `GetCancelText` 추가
+- `ALRDoor`: 레벨 이동 액터. 5초 대기 후 `OpenLevel`. 이동 전 인벤/보관함을 `ULRGameInstance`에 저장
+- `ULRGameInstance`: `PersistentInventory`, `PersistentStorageItems`, `bHasTravelData` (UPROPERTY로 GC 방지)
+- `ALRStorage::BeginPlay`: GameInstance에서 보관함 복원
+- `ALRCharacter::BeginPlay`: GameInstance에서 인벤토리 복원
+- `ALRGameMode`: `RespawnLevelName` — 사망 시 기지로 레벨 이동 + 인벤 초기화
+- 에디터: 두 맵(L_Base, L_DangerZone) 생성, NavMesh, ALRDoor 배치 완료
 
 ---
 
-## Day 12 — UI 시스템 (Minimum Viable HUD)
+## Day 12 — Minimum Viable HUD (완료)
 
-**목표:** 게임을 멈추지 않고 모든 핵심 상태를 한눈에 본다.
-
-| 우선순위 | 항목 | 비고 |
-|---|---|---|
-| 🔴 필수 | Health / Stamina ProgressBar (좌측 하단) | `OnHealthChanged` / `OnStaminaChanged` 델리게이트 바인딩 |
-| 🔴 필수 | Noise Indicator (중앙 상단, 원형) | Crouch/Walk/Run 차이가 눈에 보여야 함 |
-| 🔴 필수 | 수색 게이지 (중앙 하단, 조건부 표시) | `OnSearchProgress(float)` 델리게이트 추가 필요 |
-| 🔴 필수 | 상호작용 프롬프트 | `GetInteractionPrompt()` 이미 준비됨 |
-| 🟡 권장 | 인벤토리 슬롯 6칸 아이콘 (우측 하단) | 텍스트 폴백 가능 |
-| 🟢 옵션 | 게임 오버 / 클리어 화면 | 검은 화면 + 텍스트면 충분 |
-
-**구현 순서:** UMG 위젯 → `BP_LRCharacter` HUD 클래스 지정 → StatusComponent 델리게이트 연결 → 수색 게이지 → 인벤토리는 마지막.
+- `ULRHudWidget` C++ 클래스 (`UUserWidget` 상속)
+- **WBP_LRHud** 위젯 블루프린트 생성, 부모 클래스를 `LRHudWidget`으로 지정
+- **BP_LRCharacter** `HudWidgetClass`에 `WBP_LRHud` 할당
+- 위젯 구성: `PB_HP`(좌하단), `PB_Stamina`(좌하단), `PB_Noise`(중앙상단), `TB_Prompt`(중앙하단)
+- 점 애니메이션: `수색중.` / `수색중..` / `수색중...` — 0.4초 간격 NativeTick
+- 완료 텍스트: 오브젝트별 `GetCompleteText()` (`수색완료` / `이동완료`), 2초 후 숨김
+- 취소 텍스트: 오브젝트별 `GetCancelText()` (`수색이 취소되었습니다.` / `이동이 취소되었습니다.`)
+- `PB_Search`는 텍스트 애니메이션으로 대체 → `BindWidgetOptional` 처리
 
 ---
 
@@ -189,8 +189,8 @@ Shipping 빌드 1회 패키징 → 실행 → 기본 루프 확인.
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, Day 11 진행 중.
-C++ 작업(GetInteractionPrompt, 프롬프트 표시)은 완료.
-현재 에디터에서 L_Day11_Blockout 맵 블록아웃 작업 중.
+Last Refuge UE5.7 C++ 프로젝트, Day 13 시작.
+Day 11(레벨 전환, ALRDoor, GameInstance 영속), Day 12(ULRHudWidget, 점 애니메이션, 완료/취소 텍스트) 완료.
+다음 작업: 밸런싱(AI 수치 조정) + 사운드(발자국/피격음) + Shipping 사전 빌드.
 엔진: UE 5.7.4, IDE: Rider, 접두사: LR
 ```
