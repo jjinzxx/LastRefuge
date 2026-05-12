@@ -168,6 +168,10 @@ protected:
     float CurrentSearchTime = 0.f;
     float SearchDuration = 0.f;
 
+    // --- 소음 리플 링 (3D 월드, 바닥에 DrawDebugCircle) ---
+    float NoiseRingPhase[3] = { 0.f, 0.333f, 0.667f };
+    static constexpr float NoiseRingCycleSpeed = 1.0f;
+
     // 현재 상호작용 중인 대상 기억
     UPROPERTY()
     AActor* CurrentInteractable;

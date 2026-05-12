@@ -1,4 +1,4 @@
-﻿#include "UI/LRHudWidget.h"
+#include "UI/LRHudWidget.h"
 #include "Character/LRCharacter.h"
 #include "Components/LRStatusComponent.h"
 #include "Components/ProgressBar.h"
@@ -35,14 +35,7 @@ void ULRHudWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	// Noise 바 폴링
-	if (StatusComponent)
-	{
-		const float NoisePercent = FMath::Clamp(StatusComponent->GetNoiseRadius() / 1200.f, 0.f, 1.f);
-		PB_Noise->SetPercent(NoisePercent);
-	}
-
-	// 점 애니메이션 (수색중. / 수색중.. / 수색중...)
+	// --- 점 애니메이션 (수색중. / 수색중.. / 수색중...) ---
 	if (bIsAnimating)
 	{
 		DotTimer += InDeltaTime;
@@ -71,10 +64,11 @@ void ULRHudWidget::OnStaminaChanged(float NewStamina, float MaxStamina)
 	PB_Stamina->SetPercent(NewStamina / MaxStamina);
 }
 
+// --- 수색 게이지 ---
 
 void ULRHudWidget::OnSearchProgressChanged(float Progress)
 {
-	// 진행률 바는 사용하지 않음 — 텍스트 애니메이션으로 대체
+	// 텍스트 애니메이션으로 대체 — 사용하지 않음
 }
 
 void ULRHudWidget::OnSearchStarted(FText InProgressBaseText)
@@ -84,11 +78,9 @@ void ULRHudWidget::OnSearchStarted(FText InProgressBaseText)
 	DotTimer = 0.f;
 	DotState = 0;
 
-	// 애니메이션 첫 프레임 즉시 표시
 	TB_Prompt->SetText(FText::FromString(ProgressBaseText + TEXT(".")));
 	TB_Prompt->SetVisibility(ESlateVisibility::Visible);
 
-	// 완료 타이머 초기화 (이전 완료 메시지 도중 새 수색 시작 시)
 	GetWorld()->GetTimerManager().ClearTimer(CompletionHideTimer);
 }
 
@@ -97,12 +89,9 @@ void ULRHudWidget::OnSearchEnded(bool bCompleted, FText StatusText)
 	bIsAnimating = false;
 	GetWorld()->GetTimerManager().ClearTimer(CompletionHideTimer);
 
-	FText DisplayText = StatusText;
-
-	TB_Prompt->SetText(DisplayText);
+	TB_Prompt->SetText(StatusText);
 	TB_Prompt->SetVisibility(ESlateVisibility::Visible);
 
-	// 2초 후 자동으로 숨김
 	GetWorld()->GetTimerManager().SetTimer(
 		CompletionHideTimer, this, &ULRHudWidget::HidePrompt, 2.f, false);
 }
@@ -116,12 +105,10 @@ void ULRHudWidget::HidePrompt()
 
 void ULRHudWidget::OnInteractionPromptChanged(FText Prompt)
 {
-	// 수색 중에는 애니메이션 텍스트가 우선
 	if (bIsAnimating) return;
 
 	if (Prompt.IsEmpty())
 	{
-		// 완료 메시지 표시 중이면 건드리지 않음
 		if (!GetWorld()->GetTimerManager().IsTimerActive(CompletionHideTimer))
 		{
 			TB_Prompt->SetVisibility(ESlateVisibility::Hidden);

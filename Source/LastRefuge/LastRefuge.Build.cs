@@ -19,6 +19,7 @@ public class LastRefuge : ModuleRules
 			"GameplayStateTreeModule",
 			"UMG",
 			"Slate",
+			"SlateCore",
 			"EnhancedInput",
 			"AIModule",
 			"NavigationSystem", 

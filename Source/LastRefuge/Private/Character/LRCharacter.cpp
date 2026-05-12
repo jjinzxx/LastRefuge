@@ -1,4 +1,5 @@
 #include "Character/LRCharacter.h"
+#include "DrawDebugHelpers.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
@@ -304,6 +305,55 @@ void ALRCharacter::Tick(float DeltaTime)
     // GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::Yellow, FString::Printf(TEXT("Stamina: %.1f"), StatusComponent->GetStamina()));
     // GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Red, FString::Printf(TEXT("Health: %.1f"), StatusComponent->GetHealth()));
     
+    // --- 소음 리플 링 (캐릭터 발밑 바닥에 원 3개) ---
+    if (StatusComponent)
+    {
+        const float NoiseRadius   = StatusComponent->GetNoiseRadius();
+        const float NoisePercent  = FMath::Clamp(NoiseRadius / 1200.f, 0.f, 1.f);
+
+        if (NoisePercent > 0.01f)
+        {
+            // 발바닥 위치 (캡슐 하단)
+            const FVector GroundPos = GetActorLocation() -
+                FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - 2.f);
+
+            // 소음 강도에 따라 초록 → 빨강
+            const uint8 R = static_cast<uint8>(FMath::FloorToInt(NoisePercent * 255.f));
+            const uint8 G = static_cast<uint8>(FMath::FloorToInt((1.f - NoisePercent) * 200.f));
+            const FColor BaseColor(R, G, 30);
+
+            const float Speed = NoiseRingCycleSpeed * NoisePercent;
+
+            for (int32 i = 0; i < 3; i++)
+            {
+                NoiseRingPhase[i] = FMath::Fmod(NoiseRingPhase[i] + Speed * DeltaTime, 1.f);
+                const float t = NoiseRingPhase[i];
+
+                // 반지름: 작게 시작 → NoiseRadius 만큼 확장
+                const float Radius = FMath::Lerp(30.f, NoiseRadius, t);
+
+                // 페이드: 퍼질수록 어두워짐 (DrawDebugCircle은 투명도 없으므로 밝기로 대체)
+                const float Fade = 1.f - t;
+                const FColor RingColor(
+                    static_cast<uint8>(BaseColor.R * Fade),
+                    static_cast<uint8>(BaseColor.G * Fade),
+                    static_cast<uint8>(BaseColor.B * Fade)
+                );
+
+                // 바닥에 수평으로 원을 그림 (XY 평면)
+                DrawDebugCircle(
+                    GetWorld(), GroundPos, Radius,
+                    40,           // 분할 수
+                    RingColor,
+                    false, -1.f,  // 1프레임만 표시
+                    0, 2.f,       // 선 두께
+                    FVector::ForwardVector, FVector::RightVector,
+                    false         // 축 표시 끔
+                );
+            }
+        }
+    }
+
     // --- 상호작용 프롬프트 (조준 중인 오브젝트 표시) ---
     if (!bIsSearching && Controller)
     {

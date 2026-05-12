@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
@@ -18,14 +18,15 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
-	// --- 위젯 바인딩 (이름이 Blueprint 위젯 이름과 정확히 일치해야 함) ---
+	// --- 위젯 바인딩 ---
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> PB_HP;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> PB_Stamina;
 
-	UPROPERTY(meta = (BindWidget))
+	// 노이즈 바는 제거 — 3D 월드 링으로 대체
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UProgressBar> PB_Noise;
 
 	UPROPERTY(meta = (BindWidget))
@@ -42,10 +43,9 @@ private:
 	FString ProgressBaseText;
 	bool bIsAnimating = false;
 	float DotTimer = 0.f;
-	int32 DotState = 0;  // 0=".', 1="..", 2="..."
+	int32 DotState = 0;
 
 	FTimerHandle CompletionHideTimer;
-
 	void HidePrompt();
 
 	// --- 델리게이트 핸들러 ---
