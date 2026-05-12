@@ -93,7 +93,7 @@ void ULRHudWidget::OnSearchEnded(bool bCompleted, FText StatusText)
 	TB_Prompt->SetVisibility(ESlateVisibility::Visible);
 
 	GetWorld()->GetTimerManager().SetTimer(
-		CompletionHideTimer, this, &ULRHudWidget::HidePrompt, 2.f, false);
+		CompletionHideTimer, this, &ULRHudWidget::HidePrompt, 1.f, false);
 }
 
 void ULRHudWidget::HidePrompt()
