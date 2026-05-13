@@ -1,4 +1,4 @@
-#include "Items/LRContainer.h"
+#include "Actors/LRContainer.h"
 #include "Components/StaticMeshComponent.h"
 #include "Character/LRCharacter.h"
 #include "Components/LRInventoryComponent.h"
@@ -16,7 +16,7 @@ ALRContainer::ALRContainer()
 void ALRContainer::BeginInteract(ALRCharacter* Player)
 {
 	if (bSearched) return;
-    
+
 	// (사운드 재생 등을 여기서 처리할 수 있음)
 	UE_LOG(LogTemp, Log, TEXT("컨테이너: 플레이어가 수색을 시작했습니다."));
 }
@@ -33,7 +33,7 @@ void ALRContainer::EndInteract(ALRCharacter* Player)
 	if (!bSearched)
 	{
 		bSearched = true; // 다시 못 뒤지게 막기
-        
+
 		// 플레이어의 인벤토리 컴포넌트 찾기
 		ULRInventoryComponent* Inventory = Player->FindComponentByClass<ULRInventoryComponent>();
 		if (Inventory)

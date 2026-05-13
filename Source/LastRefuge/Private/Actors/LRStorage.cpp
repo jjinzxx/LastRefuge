@@ -1,4 +1,4 @@
-#include "Items/LRStorage.h"
+#include "Actors/LRStorage.h"
 #include "Character/LRCharacter.h"
 #include "Components/LRInventoryComponent.h"
 #include "Components/StaticMeshComponent.h"

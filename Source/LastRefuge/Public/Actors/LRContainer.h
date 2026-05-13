@@ -10,8 +10,8 @@ UCLASS()
 class LASTREFUGE_API ALRContainer : public AActor, public ILRInteractable
 {
 	GENERATED_BODY()
-    
-public:    
+
+public:
 	ALRContainer();
 
 	// --- ILRInteractable 인터페이스 구현부 ---
