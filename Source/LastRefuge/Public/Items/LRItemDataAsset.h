@@ -42,4 +42,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|Effect")
 	float StaminaRestore; // 스테미나 회복량
+
+	// 저장/로드 식별자 — 에디터에서 에셋마다 고유값으로 설정
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Data")
+	FString ItemID;
+
+	// 그리드 점유 크기 (슬롯 단위)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|Grid", meta = (ClampMin = "1"))
+	int32 GridWidth = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|Grid", meta = (ClampMin = "1"))
+	int32 GridHeight = 1;
 };

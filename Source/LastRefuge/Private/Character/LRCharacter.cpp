@@ -14,8 +14,10 @@
 #include "Perception/AISense_Hearing.h"
 #include "LRGameMode.h"
 #include "LRGameInstance.h"
-#include "Components/LRInventoryComponent.h"
+#include "Components/LRInventoryGridComponent.h"
 #include "UI/LRHudWidget.h"
+#include "UI/LRInventoryGridWidget.h"
+#include "UI/LRStorageWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Items/LRItemDataAsset.h"
 #include "Interfaces/LRInteractable.h"
@@ -49,27 +51,27 @@ ALRCharacter::ALRCharacter()
     StimuliSource->RegisterForSense(UAISense_Sight::StaticClass());
     StimuliSource->RegisterForSense(UAISense_Hearing::StaticClass());
     StimuliSource->bAutoRegister = true;
-    
-    InventoryComponent = CreateDefaultSubobject<ULRInventoryComponent>(TEXT("InventoryComponent"));
+
+    InventoryGrid = CreateDefaultSubobject<ULRInventoryGridComponent>(TEXT("InventoryGrid"));
 }
 
 void ALRCharacter::BeginPlay()
 {
     Super::BeginPlay();
     
-    if (InventoryComponent)
+    if (InventoryGrid)
     {
-        UE_LOG(LogTemp, Log, TEXT("Inventory System Initialized."));
+        UE_LOG(LogTemp, Log, TEXT("Grid Inventory System Initialized."));
 
-        // 레벨 이동 후 인벤토리 복원
+        // 레벨 이동 후 인벤토리 복원 (FLRGridItem — 위치 정보 포함)
         if (ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance()))
         {
             if (GI->bHasTravelData)
             {
-                for (const FLRItemSlot& Slot : GI->PersistentInventory)
+                for (const FLRGridItem& Item : GI->PersistentInventory)
                 {
-                    if (!Slot.IsEmpty())
-                        InventoryComponent->AddItem(Slot.ItemData, Slot.Quantity);
+                    if (!Item.IsEmpty())
+                        InventoryGrid->PlaceItem(Item.GridX, Item.GridY, Item, Item.bIsRotated);
                 }
             }
         }
@@ -126,11 +128,12 @@ void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
             EIC->BindAction(SprintAction, ETriggerEvent::Completed, this, &ALRCharacter::StopSprint);
         }
 
-        // 상호작용 (E키 바인딩) - 에디터에서 IA_Interact 할당 필요
         if (IA_Interact)
-        {
             EIC->BindAction(IA_Interact, ETriggerEvent::Started, this, &ALRCharacter::TryInteract);
-        }
+
+        // 인벤토리 열기/닫기 (Tab키 — 에디터에서 IA_Inventory 할당 필요)
+        if (IA_Inventory)
+            EIC->BindAction(IA_Inventory, ETriggerEvent::Started, this, &ALRCharacter::ToggleInventory);
     }
 }
 
@@ -491,15 +494,12 @@ void ALRCharacter::CancelSearch()
     {
         ILRInteractable* InteractableTarget = Cast<ILRInteractable>(CurrentInteractable);
 
-        // 취소 텍스트를 nullptr 처리 전에 미리 가져옴
         FText CancelText = InteractableTarget
             ? InteractableTarget->GetCancelText()
             : FText::GetEmpty();
 
         if (InteractableTarget)
-        {
             InteractableTarget->EndInteract(nullptr);
-        }
 
         bIsSearching = false;
         CurrentSearchTime = 0.f;
@@ -507,4 +507,111 @@ void ALRCharacter::CancelSearch()
 
         OnSearchEnded.Broadcast(false, CancelText);
     }
+}
+
+void ALRCharacter::ToggleInventory()
+{
+    UE_LOG(LogTemp, Warning, TEXT("[Inventory] ToggleInventory 호출됨"));
+
+    if (!InventoryWidgetClass)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Inventory] InventoryWidgetClass가 null — BP_LRCharacter에서 WBP_InventoryGrid 할당 필요"));
+        return;
+    }
+
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Inventory] PlayerController null"));
+        return;
+    }
+
+    if (!bInventoryOpen)
+    {
+        if (!InventoryWidget)
+        {
+            InventoryWidget = CreateWidget<ULRInventoryGridWidget>(PC, InventoryWidgetClass);
+            if (InventoryWidget)
+            {
+                InventoryWidget->InitGrid(InventoryGrid, nullptr);
+                UE_LOG(LogTemp, Warning, TEXT("[Inventory] 위젯 생성 완료"));
+            }
+            else
+            {
+                UE_LOG(LogTemp, Error, TEXT("[Inventory] CreateWidget 실패"));
+                return;
+            }
+        }
+        if (InventoryWidget)
+        {
+            InventoryWidget->AddToViewport(5);
+            PC->SetShowMouseCursor(true);
+            PC->SetInputMode(FInputModeGameAndUI());
+            UE_LOG(LogTemp, Warning, TEXT("[Inventory] 열림"));
+        }
+    }
+    else
+    {
+        if (InventoryWidget)
+        {
+            InventoryWidget->RemoveFromParent();
+            PC->SetShowMouseCursor(false);
+            PC->SetInputMode(FInputModeGameOnly());
+        }
+    }
+
+    bInventoryOpen = !bInventoryOpen;
+}
+
+// ──────────────────────────────────────────────────────────
+// OpenStorageScreen / CloseStorageScreen
+// ALRStorage::EndInteract 에서 호출됨.
+// 이미 열려 있으면 E 재입력 시 닫힘.
+// ──────────────────────────────────────────────────────────
+void ALRCharacter::OpenStorageScreen(ULRInventoryGridComponent* InStorageGrid)
+{
+    if (bStorageOpen)
+    {
+        CloseStorageScreen();
+        return;
+    }
+
+    if (!StorageWidgetClass)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Storage] StorageWidgetClass null — BP_LRCharacter에서 WBP_Storage 할당 필요"));
+        return;
+    }
+
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC) return;
+
+    // 매번 새로 생성하여 올바른 StorageGrid로 초기화
+    StorageWidget = CreateWidget<ULRStorageWidget>(PC, StorageWidgetClass);
+    if (!StorageWidget) return;
+
+    StorageWidget->InitStorage(InventoryGrid, InStorageGrid);
+    StorageWidget->AddToViewport(5);
+
+    PC->SetShowMouseCursor(true);
+    PC->SetInputMode(FInputModeGameAndUI());
+
+    bStorageOpen = true;
+    UE_LOG(LogTemp, Warning, TEXT("[Storage] 보관함 UI 열림"));
+}
+
+void ALRCharacter::CloseStorageScreen()
+{
+    if (StorageWidget)
+        StorageWidget->RemoveFromParent();
+
+    StorageWidget = nullptr;
+    bStorageOpen  = false;
+
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        PC->SetShowMouseCursor(false);
+        PC->SetInputMode(FInputModeGameOnly());
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[Storage] 보관함 UI 닫힘"));
 }

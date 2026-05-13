@@ -15,7 +15,7 @@ void ALRGameMode::OnPlayerDied(AController* DeadController)
 	// 사망 시 GameInstance 인벤토리 초기화 (보관함은 유지)
 	if (ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance()))
 	{
-		GI->PersistentInventory.Empty();
+		GI->PersistentInventory.Empty(); // FLRGridItem 배열 — API 동일
 	}
 
 	// 모든 LRBot AI를 Patrol로 강제 복귀 (옛 사망 위치 응시 방지)

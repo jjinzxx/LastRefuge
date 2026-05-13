@@ -3,8 +3,9 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Interfaces/LRInteractable.h"
-#include "Items/LRInventoryStructs.h"
 #include "LRStorage.generated.h"
+
+class ULRInventoryGridComponent;
 
 UCLASS()
 class LASTREFUGE_API ALRStorage : public AActor, public ILRInteractable
@@ -25,12 +26,13 @@ public:
 	virtual FText GetCompleteText() const override;
 
 	UFUNCTION(BlueprintPure, Category = "LR|Storage")
-	const TArray<FLRItemSlot>& GetStoredItems() const { return StoredItems; }
+	ULRInventoryGridComponent* GetStorageGrid() const { return StorageGrid; }
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<class UStaticMeshComponent> MeshComponent;
 
+	// 창고 그리드 (10x5 기본)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Storage")
-	TArray<FLRItemSlot> StoredItems;
+	TObjectPtr<ULRInventoryGridComponent> StorageGrid;
 };

@@ -1,6 +1,6 @@
 #include "Actors/LRDoor.h"
 #include "Character/LRCharacter.h"
-#include "Components/LRInventoryComponent.h"
+#include "Components/LRInventoryGridComponent.h"
 #include "Actors/LRStorage.h"
 #include "LRGameInstance.h"
 #include "Kismet/GameplayStatics.h"
@@ -34,34 +34,36 @@ void ALRDoor::EndInteract(ALRCharacter* Player)
 	ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance());
 	if (!GI)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[Door] 이동 실패 — GameInstance가 LRGameInstance가 아님. 프로젝트 세팅 확인 필요."));
+		UE_LOG(LogTemp, Error, TEXT("[Door] 이동 실패 — GameInstance가 LRGameInstance가 아님."));
 		return;
 	}
 
-	// 인벤토리 저장
-	ULRInventoryComponent* Inv = Player->FindComponentByClass<ULRInventoryComponent>();
-	if (Inv)
+	// 인벤토리 직렬화 (FLRGridItem — 위치 정보 포함)
+	if (ULRInventoryGridComponent* InvGrid = Player->GetInventoryGrid())
 	{
 		GI->PersistentInventory.Empty();
-		for (const FLRItemSlot& Slot : Inv->GetInventorySlots())
+		for (const auto& [ID, Item] : InvGrid->GetItems())
 		{
-			if (!Slot.IsEmpty())
-				GI->PersistentInventory.Add(Slot);
+			if (!Item.IsEmpty())
+				GI->PersistentInventory.Add(Item);
 		}
 	}
 
-	// 보관함 저장 (기지 출구에만 bSaveStorage = true)
+	// 보관함 직렬화 (기지 출구에만 bSaveStorage = true)
 	if (bSaveStorage)
 	{
 		GI->PersistentStorageItems.Empty();
 		for (TActorIterator<ALRStorage> It(GetWorld()); It; ++It)
 		{
-			for (const FLRItemSlot& Slot : It->GetStoredItems())
+			if (ULRInventoryGridComponent* SGrid = It->GetStorageGrid())
 			{
-				if (!Slot.IsEmpty())
-					GI->PersistentStorageItems.Add(Slot);
+				for (const auto& [ID, Item] : SGrid->GetItems())
+				{
+					if (!Item.IsEmpty())
+						GI->PersistentStorageItems.Add(Item);
+				}
 			}
-			break;
+			break; // 맵에 보관함이 1개라고 가정
 		}
 	}
 
@@ -70,32 +72,9 @@ void ALRDoor::EndInteract(ALRCharacter* Player)
 	UGameplayStatics::OpenLevel(this, TargetLevel);
 }
 
-float ALRDoor::GetInteractionDuration() const
-{
-	return InteractionDuration;
-}
-
-FText ALRDoor::GetInteractionPrompt() const
-{
-	return PromptText;
-}
-
-FText ALRDoor::GetProgressText() const
-{
-	return FText::FromString(TEXT("이동중"));
-}
-
-FText ALRDoor::GetStartText() const
-{
-	return FText::FromString(TEXT("이동 시작..."));
-}
-
-FText ALRDoor::GetCancelText() const
-{
-	return FText::FromString(TEXT("이동이 취소되었습니다."));
-}
-
-FText ALRDoor::GetCompleteText() const
-{
-	return FText::FromString(TEXT("이동완료"));
-}
+float ALRDoor::GetInteractionDuration() const { return InteractionDuration; }
+FText ALRDoor::GetInteractionPrompt()   const { return PromptText; }
+FText ALRDoor::GetProgressText()        const { return FText::FromString(TEXT("이동중")); }
+FText ALRDoor::GetStartText()           const { return FText::FromString(TEXT("이동 시작...")); }
+FText ALRDoor::GetCancelText()          const { return FText::FromString(TEXT("이동이 취소되었습니다.")); }
+FText ALRDoor::GetCompleteText()        const { return FText::FromString(TEXT("이동완료")); }
