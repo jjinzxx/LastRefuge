@@ -557,10 +557,12 @@ void ALRCharacter::ToggleInventory()
                 UE_LOG(LogTemp, Error, TEXT("[Inventory] CreateWidget 실패"));
                 return;
             }
-            constexpr float SlotSizePx = 60.f;
-            InventoryWidget->InitGrid(InventoryGrid, nullptr, SlotSizePx);
             UE_LOG(LogTemp, Warning, TEXT("[Inventory] 위젯 생성 완료"));
         }
+
+        // NativeDestruct가 OnGridChanged 핸들을 제거하므로 열 때마다 재등록·재빌드 필요
+        constexpr float SlotSizePx = 60.f;
+        InventoryWidget->InitGrid(InventoryGrid, nullptr, SlotSizePx);
 
         InventoryWidget->AddToViewport(5);
         {

@@ -35,6 +35,7 @@ void ULRSaveGame::Save(
 			SI.GridY      = Item.GridY;
 			SI.bIsRotated = Item.bIsRotated;
 			SI.bIsStorage = bIsStorage;
+			SI.Quantity   = Item.Quantity;
 			SaveObj->SavedItems.Add(SI);
 		}
 	};
@@ -94,6 +95,7 @@ void ULRSaveGame::Load(
 		Item.ItemData  = const_cast<ULRItemDataAsset*>(*DataPtr);
 		Item.Width     = (*DataPtr)->GridWidth;
 		Item.Height    = (*DataPtr)->GridHeight;
+		Item.Quantity  = FMath::Max(1, SI.Quantity);
 
 		ULRInventoryGridComponent* Target = SI.bIsStorage ? StorageGrid : InvGrid;
 		const int32 PlacedID = Target->PlaceItem(SI.GridX, SI.GridY, Item, SI.bIsRotated);

@@ -118,8 +118,45 @@ bool ULRInventoryGridComponent::UseItem(int32 InItemID)
 		}
 	}
 
-	RemoveItem(InItemID);
+	// 수량 1 감소 — 0이 되면 그리드에서 제거
+	Found->Quantity--;
+	if (Found->Quantity <= 0)
+		RemoveItem(InItemID);
+	else
+		OnGridChanged.Broadcast();
+
 	return true;
+}
+
+// ──────────────────────────────────────────────────────────────
+// CanStack — (X,Y) 셀에 같은 종류 아이템이 있고 MaxStackSize 미만이면 true
+// ──────────────────────────────────────────────────────────────
+bool ULRInventoryGridComponent::CanStack(int32 X, int32 Y, const FLRGridItem& InItem) const
+{
+	const int32 ExistingID = GetItemIDAt(X, Y);
+	if (ExistingID == INDEX_NONE) return false;
+
+	const FLRGridItem* Existing = Items.Find(ExistingID);
+	return Existing
+		&& Existing->ItemData == InItem.ItemData
+		&& InItem.ItemData
+		&& InItem.ItemData->MaxStackSize > 1
+		&& Existing->Quantity + InItem.Quantity <= InItem.ItemData->MaxStackSize;
+}
+
+// ──────────────────────────────────────────────────────────────
+// AddToStack — ItemID 아이템에 수량 추가. 실제 추가된 수량 반환.
+// ──────────────────────────────────────────────────────────────
+int32 ULRInventoryGridComponent::AddToStack(int32 InItemID, int32 Amount)
+{
+	FLRGridItem* Existing = Items.Find(InItemID);
+	if (!Existing || !Existing->ItemData) return 0;
+
+	const int32 CanAdd = Existing->ItemData->MaxStackSize - Existing->Quantity;
+	const int32 Added  = FMath::Min(Amount, CanAdd);
+	Existing->Quantity += Added;
+	OnGridChanged.Broadcast();
+	return Added;
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -153,6 +190,21 @@ bool ULRInventoryGridComponent::FindEmptySpace(
 		}
 	}
 	return false;
+}
+
+int32 ULRInventoryGridComponent::ReduceQuantity(int32 InItemID, int32 Amount)
+{
+	FLRGridItem* Found = Items.Find(InItemID);
+	if (!Found) return 0;
+
+	Found->Quantity = FMath::Max(0, Found->Quantity - Amount);
+	if (Found->Quantity <= 0)
+	{
+		RemoveItem(InItemID);
+		return 0;
+	}
+	OnGridChanged.Broadcast();
+	return Found->Quantity;
 }
 
 int32 ULRInventoryGridComponent::GetItemIDAt(int32 X, int32 Y) const

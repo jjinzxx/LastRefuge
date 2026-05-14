@@ -25,22 +25,36 @@ void ALRContainer::BeginPlay()
 	{
 		if (!ItemData) continue;
 
+		// 같은 종류 아이템이 있고 MaxStackSize에 여유가 있으면 수량 합산
+		if (ItemData->MaxStackSize > 1)
+		{
+			bool bStacked = false;
+			for (const auto& [ID, ExistingItem] : ContainerGrid->GetItems())
+			{
+				if (ExistingItem.ItemData == ItemData &&
+					ExistingItem.Quantity < ItemData->MaxStackSize)
+				{
+					ContainerGrid->AddToStack(ID, 1);
+					bStacked = true;
+					break;
+				}
+			}
+			if (bStacked) continue;
+		}
+
+		// 스태킹 불가 → 빈 슬롯에 새로 배치
 		FLRGridItem NewItem;
 		NewItem.ItemData = ItemData;
 		NewItem.Width    = ItemData->GridWidth;
 		NewItem.Height   = ItemData->GridHeight;
+		NewItem.Quantity = 1;
 
 		int32 OutX, OutY;
 		bool bOutRotated;
 		if (ContainerGrid->FindEmptySpace(NewItem, OutX, OutY, bOutRotated))
-		{
 			ContainerGrid->PlaceItem(OutX, OutY, NewItem, bOutRotated);
-			UE_LOG(LogTemp, Warning, TEXT("[Container] 아이템 배치: %s → (%d,%d)"), *ItemData->ItemName.ToString(), OutX, OutY);
-		}
 		else
-		{
 			UE_LOG(LogTemp, Error, TEXT("[Container] 공간 없음: %s"), *ItemData->ItemName.ToString());
-		}
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("[Container] ContainerGrid 아이템 수: %d"), ContainerGrid->GetItems().Num());

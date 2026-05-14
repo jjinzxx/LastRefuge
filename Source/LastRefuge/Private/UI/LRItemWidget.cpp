@@ -3,6 +3,7 @@
 #include "Components/LRInventoryGridComponent.h"
 #include "Items/LRItemDataAsset.h"
 #include "Components/Image.h"
+#include "Components/TextBlock.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 
 void ULRItemWidget::Init(const FLRGridItem& InItem, int32 InItemID,
@@ -18,8 +19,20 @@ void ULRItemWidget::Init(const FLRGridItem& InItem, int32 InItemID,
 
 	// 아이콘 텍스처 적용
 	if (ItemIcon && InItem.ItemData && InItem.ItemData->ItemIcon)
-	{
 		ItemIcon->SetBrushFromTexture(InItem.ItemData->ItemIcon);
+
+	// 수량 텍스트 — Quantity > 1일 때만 표시
+	if (QuantityText)
+	{
+		if (InItem.Quantity > 1)
+		{
+			QuantityText->SetText(FText::AsNumber(InItem.Quantity));
+			QuantityText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		else
+		{
+			QuantityText->SetVisibility(ESlateVisibility::Collapsed);
+		}
 	}
 }
 
@@ -78,11 +91,10 @@ void ULRItemWidget::NativeOnDragDetected(
 	UE_LOG(LogTemp, Warning, TEXT("[Item] DragDetected 시작 — %s"), *GetName());
 
 	ULRItemDragDropOperation* Op = NewObject<ULRItemDragDropOperation>(this);
-	Op->DraggedItem     = GridItem;
-	Op->SourceGrid      = SourceGridComponent;
-	Op->SourceItemID    = ItemID;
-	Op->GrabOffsetSlots = GrabOffsetSlots;
-	Op->Pivot           = EDragPivot::MouseDown;
+	Op->DraggedItem  = GridItem;
+	Op->SourceGrid   = SourceGridComponent;
+	Op->SourceItemID = ItemID;
+	Op->Pivot        = EDragPivot::TopLeft;
 
 	// ULRItemWidget은 루트 캔버스 DesiredSize=0이라 드래그 비주얼이 안 보임.
 	// UImage에 FSlateBrush.ImageSize를 명시하면 SImage의 DesiredSize가 아이템 크기가 됨.

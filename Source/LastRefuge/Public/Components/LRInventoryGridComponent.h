@@ -38,8 +38,17 @@ public:
 	/** 아이템 제거. 제거된 FLRGridItem 반환 */
 	FLRGridItem RemoveItem(int32 InItemID);
 
-	/** 소비 아이템 사용 — 효과 적용 후 제거 */
+	/** 소비 아이템 사용 — 수량 1 감소, 0이면 제거 */
 	bool UseItem(int32 InItemID);
+
+	/** (X,Y) 셀의 아이템에 스택 가능한지 확인 */
+	bool CanStack(int32 X, int32 Y, const FLRGridItem& InItem) const;
+
+	/** ItemID 아이템에 수량 추가. 실제 추가된 수량 반환 */
+	int32 AddToStack(int32 InItemID, int32 Amount);
+
+	/** 수량 감소. 0이 되면 제거. 남은 수량 반환 (제거 시 0) */
+	int32 ReduceQuantity(int32 InItemID, int32 Amount);
 
 	// ── 빈 공간 탐색 ──────────────────────────────────────
 

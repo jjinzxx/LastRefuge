@@ -25,11 +25,4 @@ public:
 
 	// 소스 그리드에서의 ItemID (드롭 취소 시 원위치 복원에 사용)
 	int32 SourceItemID = INDEX_NONE;
-
-	/**
-	 * 아이템 위젯 내에서 마우스가 클릭된 슬롯 단위 오프셋.
-	 * 드래그 중 아이템이 클릭 지점을 기준으로 따라오도록 하는 핵심 값.
-	 * 예: 2x3 아이템의 (1, 1) 슬롯을 클릭했으면 GrabOffsetSlots = (1.f, 1.f)
-	 */
-	FVector2D GrabOffsetSlots = FVector2D::ZeroVector;
 };

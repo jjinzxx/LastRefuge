@@ -36,6 +36,10 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> ItemIcon;
 
+	// BP에서 BindWidgetOptional — WBP_LRItem에 "QuantityText" TextBlock 추가 시 활성
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> QuantityText;
+
 protected:
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry,
 	                                        const FPointerEvent& InMouseEvent) override;

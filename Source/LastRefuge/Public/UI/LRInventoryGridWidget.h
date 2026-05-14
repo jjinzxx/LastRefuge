@@ -8,6 +8,7 @@
 class ULRInventoryGridComponent;
 class ULRItemWidget;
 class ULRTooltipWidget;
+class ULRContextMenuWidget;
 class UCanvasPanel;
 
 /**
@@ -45,6 +46,9 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "LR|Inventory")
 	TSubclassOf<ULRTooltipWidget> TooltipWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Inventory")
+	TSubclassOf<ULRContextMenuWidget> ContextMenuWidgetClass;
 
 	// 그리드 선 색상
 	UPROPERTY(EditDefaultsOnly, Category = "LR|Inventory")
@@ -111,8 +115,12 @@ private:
 	FIntPoint HoveredCell = FIntPoint(-1, -1);
 
 	// 드래그 대기 상태
-	int32 PendingDragItemID = INDEX_NONE;
-	FVector2D GrabOffsetSlots = FVector2D::ZeroVector;
+	int32 PendingDragItemID  = INDEX_NONE;
+	bool  bRightClickPending = false; // 우클릭 마우스업 시 컨텍스트메뉴 표시 여부
+
+	// 활성 컨텍스트 메뉴
+	UPROPERTY()
+	TObjectPtr<ULRContextMenuWidget> ActiveContextMenu;
 
 	// OnGridChanged 델리게이트 핸들
 	FDelegateHandle GridChangedHandle;
@@ -125,4 +133,6 @@ private:
 	void RebuildGrid();
 	void ShowPreview(int32 GridX, int32 GridY, const FLRGridItem& Item, bool bCanPlace);
 	void HidePreview();
+	void ShowContextMenu(int32 ItemID, const FLRGridItem& Item);
+	void CloseContextMenu();
 };

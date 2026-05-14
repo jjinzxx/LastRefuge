@@ -51,6 +51,9 @@ struct FLRGridItem
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
 	bool bIsRotated = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
+	int32 Quantity = 1;
+
 	bool IsEmpty() const { return ItemData == nullptr; }
 
 	// 회전 반영된 실제 점유 크기
@@ -80,4 +83,7 @@ struct FLRSavedItem
 
 	UPROPERTY()
 	bool bIsStorage = false; // true = 창고, false = 인벤토리
+
+	UPROPERTY()
+	int32 Quantity = 1;
 };

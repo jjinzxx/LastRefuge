@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 14 진행 중)
+# Last Refuge - 개발 인수인계 문서 (Day 14 완료)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -194,8 +194,8 @@ USTRUCT() FLRSavedItem {
 | Day 11 | GetInteractionPrompt + 레벨 전환(ALRDoor) + GameInstance 인벤/보관함 영속 | ✅ 완료 |
 | Day 12 | Minimum Viable HUD (ULRHudWidget, 점 애니메이션, 완료/취소 텍스트) | ✅ 완료 |
 | Day 13 | **타르코프 스타일 그리드 인벤토리 + 보관함 분할 UI** | ✅ 완료 |
-| Day 14 | **그리드 UI 버그 수정 + 아이템 스태킹 + 좌/우클릭 분리** | 🔄 진행 중 |
-| Day 15 | **최종 빌드 + QA + 시연 영상** | ⬜ 미완료 |
+| Day 14 | **그리드 UI 버그 수정 + 아이템 스태킹 + 좌/우클릭 분리 + 컨텍스트 메뉴** | ✅ 완료 |
+| Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | ⬜ 미완료 |
 
 ---
 
@@ -235,47 +235,104 @@ USTRUCT() FLRSavedItem {
 - 그리드 슬롯 크기 50px → 60px
 - 스토리지 화면 중복 열기/닫기 버그 수정 (`bStorageOpen` 가드 추가)
 
-### 미해결 버그 — 드래그 프리뷰 위치 (그리드 엣지 아이템)
+### ~~미해결 버그 — 드래그 프리뷰 위치~~ ✅ 해결됨
 
-**증상**: 아이템을 그리드 우측/하단 끝 (예: 9,4)에서 들면 프리뷰가 예상과 다른 위치에 표시됨. 중간 위치(예: 1,0)에서는 정상.
+**해결**: `EDragPivot::TopLeft` + 커서 기준 배치로 단순화. 프리뷰·배치 모두 커서 셀 기준으로 통일.
+- GrabOffset 제거 (`FLRItemDragDropOperation.GrabOffsetSlots`, `LRInventoryGridWidget.GrabOffsetSlots` 삭제)
+- `NativePaint` 프리뷰 조건에 `PreviewGridPos.Y >= 0` 추가
 
-**현재 진단 상태**:
-- `NativePaint` 방식으로 좌표계 문제는 해결됨
-- `GrabOffsetSlots` 계산 문제로 추정
-- `[Grab]` 진단 로그 추가됨: `NativeOnMouseButtonDown`에서 `ItemOrigin`, `ItemSize`, `GrabOffset` 출력
-- **다음 세션에서**: 엣지 위치(9,4)에서 드래그 후 `[Grab]` 로그 값 확인해서 원인 규명
+### ⚠️ 알려진 이슈 — 드래그 시작 시 아이콘 플리커 (QA 처리)
 
-```cpp
-// LRInventoryGridWidget.cpp — MouseButtonDown의 진단 로그
-UE_LOG(LogTemp, Warning, TEXT("[Grab] ItemOrigin=(%d,%d) ItemSize=(%d×%d) ClickPx=(%.0f,%.0f) GrabOffset=(%.2f,%.2f)"), ...)
+**증상**: 드래그를 시작하면 아이콘이 잠깐 화면 왼쪽 위에서 커서 위치로 날아오는 것처럼 보임.
+
+**원인**: UMG DragDrop 시스템에서 `NewObject`로 생성한 위젯은 첫 프레임에 레이아웃이 없어
+Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 이동. Slate 레이어를 직접 구현하지
+않으면 UMG API 레벨에서 완전히 해결 불가.
+
+**영향 범위**: 시각적 글리치, 기능(배치·취소·프리뷰)에는 영향 없음. **Day 15 QA "알려진 이슈"로 기록.**
+
+### Day 14에서 추가 구현된 것 (스태킹 · 컨텍스트 메뉴)
+
+#### 아이템 스태킹
+- `FLRGridItem.Quantity`, `FLRSavedItem.Quantity` 필드 추가
+- `ULRInventoryGridComponent`: `CanStack()`, `AddToStack()`, `ReduceQuantity()` 추가
+- `ULRItemWidget`: `QuantityText` (BindWidgetOptional), Quantity > 1일 때만 표시
+- `ALRContainer::BeginPlay`: 기존 스택에 합산 우선, 공간 없으면 FindEmptySpace
+
+#### 좌클릭 / 우클릭 분리
+- `ULRInventoryGridWidget::NativeOnMouseButtonDown`: 좌클릭=전체 드래그, 우클릭=컨텍스트 메뉴 대기
+- `NativeOnDragDetected`: 우클릭 드래그이면 `ReduceQuantity(1)` 후 1개짜리 아이템 드래그
+- `NativeOnDrop`: `CanStack` 우선 시도, 실패 시 `CheckPlacement`+`PlaceItem`
+
+#### 컨텍스트 메뉴 (ULRContextMenuWidget)
+- 우클릭 단순 클릭 → 커서 위치에 버티컬 메뉴 팝업
+- 항목: `[사용하기]` (Consumable 전용) + `[정보]` (모든 아이템)
+- 전체화면 투명 BackdropButton → 어디서든 클릭 시 메뉴 닫힘
+- 좌클릭/우클릭 모두 `CloseContextMenu()` 호출
+- `FSimpleMulticastDelegate OnMenuClosed`로 그리드에 닫힘 통보
+
+#### 인벤토리 이미지 오정렬 버그 수정
+- **원인**: `NativeDestruct`가 `OnGridChanged` 핸들 제거 → 탭 재열기 시 `RebuildGrid` 미호출
+- **수정**: `ToggleInventory` 열 때마다 `InitGrid` 재호출, `NativeDestruct`에서 `ActiveTooltip = nullptr`
+
+### WBP_ContextMenu Designer 구성 (Day 14 신규)
 ```
-
-### 다음 세션에서 할 것 (우선순위 순)
-
-#### 1. 드래그 프리뷰 버그 마무리
-- `[Grab]` 로그로 `GrabOffset` 값 확인 후 수정
-- 수정 후 진단 로그 제거
-
-#### 2. 아이템 스태킹 (같은 종류 겹쳐 보관)
-- **목표**: 같은 `ItemData`를 가진 아이템은 `MaxStackSize`까지 같은 셀에 스택 가능
-- `FLRGridItem`에 `int32 Quantity = 1` 필드 추가
-- `LRInventoryGridComponent::PlaceItem`: 같은 셀에 같은 아이템 있으면 수량 합산 (MaxStackSize 초과 시 거부 또는 분할)
-- `ULRItemWidget`: 수량 > 1이면 숫자 텍스트 표시
-- 관련 클래스 수정: `FLRGridItem`, `ULRInventoryGridComponent`, `ULRItemWidget`
-
-#### 3. 좌클릭 / 우클릭 분리
-- **현재**: 우클릭 = UseItem (소비 아이템 사용)
-- **목표**:
-  - **좌클릭 드래그**: 전체 스택 들기 (기존 동작 유지)
-  - **우클릭 드래그**: 스택에서 1개만 들기 (`Quantity--` 후 Quantity=1인 새 GridItem 드래그)
-  - 우클릭 단순 클릭(드래그 없음) → UseItem 동작은 유지
-- `NativeOnMouseButtonDown`에서 `RightMouseButton` 처리 확장
+[Root] Canvas Panel
+├── Button "BackdropButton"   Anchors (0,0)→(1,1), Offset 0, 배경 Alpha=0, ZOrder=0
+└── Vertical Box "MenuBox"    ZOrder=1, 위치는 C++에서 PositionNearMouse()로 설정
+```
 
 ---
 
-## Day 15 — 밸런싱 + 사운드 + 사전 빌드
+## Day 15 — 비주얼 · UI · 오디오 완성
 
-### 밸런싱 (60%)
+### 1. 1인칭 손 · 다리 구현
+- 캐릭터 1인칭 뷰에서 손과 다리가 화면에 보이도록 메시/애니메이션 추가
+- 아이템을 들었을 때 손에 들고 있는 모습 포함 (툴바 아이템 장착 시 연동)
+- 관련 클래스: `ALRCharacter` + 1인칭 Arms/Legs SkeletalMesh 추가
+
+### 2. 툴바 (단축키 슬롯 1~4)
+- 화면 하단 HUD에 4개 슬롯 표시
+- 인벤토리에서 아이템을 슬롯에 드래그하거나 지정 가능
+- 슬롯 유형별 동작:
+  - **장비류 (무기, 도구)** → 1인칭 손에 장착 (들고 다니기)
+  - **소비·회복 아이템** → 키 누르면 즉시 UseItem
+  - **키카드류** → 손에 들고, 문 상호작용 시 자동 소모
+- 키 바인딩: `1` `2` `3` `4`
+- 관련 클래스: `ULRHudWidget` (슬롯 UI), `ALRCharacter` (ActiveSlot 상태 관리)
+
+### 3. 적 모션 · 공격 애니메이션
+- `ALRBot` 순찰/의심/추격 상태별 Locomotion 애니메이션 연결
+- 근접 공격 또는 사격 공격 모션 추가
+- ABP_LRBot (AnimBlueprint) 작성: Idle / Walk / Run / Attack 스테이트
+
+### 4. 메인 화면 (엔트리 UI)
+- 게임 시작 시 가장 먼저 보이는 화면
+- 버튼 구성: **[게임 시작]** / **[설정]** / **[종료]**
+- 설정: 마우스 감도, 볼륨 슬라이더 등 기본 옵션
+- 관련 클래스: `ULRMainMenuWidget` (신규), 전용 맵 `L_MainMenu` 또는 레벨 블루프린트
+
+### 5. ESC 인게임 메뉴
+- 플레이 중 ESC 누르면 팝업 메뉴
+- 항목: **[계속하기]** / **[설정]** / **[메인으로]** / **[종료]**
+- `IA_Menu` (ESC 키) → `ALRCharacter::TogglePauseMenu()`
+- 관련 클래스: `ULRPauseMenuWidget` (신규)
+
+### 6. 사운드 연결
+- 발자국 3종 (Walk / Run / Crouch)
+- AI 감지 보이스 (발견 / 의심 / 복귀)
+- 피격음 / 사망음
+- 아이템 사용음 (회복, 수색 완료)
+- 수색 루프음 · 앰비언트 BGM (권장)
+- 관련 클래스: `UAudioComponent` 또는 `UGameplayStatics::PlaySoundAtLocation`
+
+---
+
+## Day 16 — 최종 빌드 + QA + 시연 영상
+
+시연 영상 컷: 타이틀(0~10s) → 잠입(10~30s) → 수색+인터럽트(30~50s) → 귀환+저장(50~70s) → 보관함 컷(70~90s)
+
+### 밸런싱 체크
 
 | 변수 | 초기값 | 조정 방향 |
 |---|---|---|
@@ -284,18 +341,6 @@ UE_LOG(LogTemp, Warning, TEXT("[Grab] ItemOrigin=(%d,%d) ItemSize=(%d×%d) Click
 | Walk 소음 반경 | 600 | Walk로 안전하게 다닐 수 있는가? |
 | 수색 시간 | 3초 | 너무 길어 답답하면 2.5초 |
 | AI 사격 데미지 | 25 | 4발 = 즉사 |
-
-### 사운드 (30%)
-발자국 3종 / AI 보이스 / 피격음 필수, 수색 루프음·BGM 권장.
-
-### 사전 빌드 (10%)
-Shipping 빌드 1회 패키징 → 실행 → 기본 루프 확인.
-
----
-
-## Day 15 — 최종 빌드 + QA + 시연 영상
-
-시연 영상 컷: 타이틀(0~10s) → 잠입(10~30s) → 수색+인터럽트(30~50s) → 귀환+저장(50~70s) → 보관함 컷(70~90s)
 
 ---
 
