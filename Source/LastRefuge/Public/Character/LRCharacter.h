@@ -14,6 +14,7 @@ class ULRInventoryGridComponent;
 class ULRInventoryGridWidget;
 class ULRStorageWidget;
 class ULRHudWidget;
+class UCanvasPanelSlot;
 
 UENUM(BlueprintType)
 enum class ELRMovementState : uint8
@@ -54,8 +55,9 @@ private:
     UPROPERTY()
     TObjectPtr<ULRStorageWidget> StorageWidget;
 
-    bool bInventoryOpen = false;
-    bool bStorageOpen   = false;
+    bool bInventoryOpen  = false;
+    bool bStorageOpen    = false;
+    bool bIgnoreLookInput = false;
 
     void ToggleInventory();
 

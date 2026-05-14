@@ -5,7 +5,7 @@
 #include "LRInventoryStructs.generated.h"
 
 // ──────────────────────────────────────────────────────────
-// 레거시 슬롯 (LRInventoryComponent, LRContainer 호환용)
+// 레거시 슬롯 (현재 미사용 — 향후 제거 예정)
 // ──────────────────────────────────────────────────────────
 USTRUCT(BlueprintType)
 struct FLRItemSlot

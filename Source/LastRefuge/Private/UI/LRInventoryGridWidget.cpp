@@ -6,6 +6,18 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Rendering/DrawElements.h"
+#include "Components/Image.h"
+
+// ──────────────────────────────────────────────────────────
+// 내부 헬퍼: GridCanvas의 위젯 로컬 원점 계산
+// 풀스크린 위젯에서 GridCanvas가 중앙에 있을 때 오프셋을 자동 보정
+// ──────────────────────────────────────────────────────────
+FVector2D ULRInventoryGridWidget::GetGridCanvasOrigin(const FGeometry& InGeometry) const
+{
+	if (!GridCanvas) return FVector2D::ZeroVector;
+	return InGeometry.AbsoluteToLocal(GridCanvas->GetCachedGeometry().GetAbsolutePosition());
+}
 
 // ──────────────────────────────────────────────────────────
 // InitGrid
@@ -21,7 +33,6 @@ void ULRInventoryGridWidget::InitGrid(
 
 	if (!GridComponent) return;
 
-	// 그리드 변경 시 자동 리빌드 구독
 	GridChangedHandle = GridComponent->OnGridChanged.AddUObject(
 		this, &ULRInventoryGridWidget::RebuildGrid);
 
@@ -32,7 +43,6 @@ void ULRInventoryGridWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// 프리뷰 위젯 미리 생성 (숨김 상태)
 	if (PreviewWidgetClass && !PreviewWidget)
 	{
 		PreviewWidget = CreateWidget<ULRDragPreviewWidget>(this, PreviewWidgetClass);
@@ -58,14 +68,227 @@ void ULRInventoryGridWidget::NativeDestruct()
 }
 
 // ──────────────────────────────────────────────────────────
-// RebuildGrid — 캔버스를 완전히 다시 그림
-// OnGridChanged 때마다 호출. 아이템 수가 적으므로 비용 허용 범위.
+// NativePaint — 그리드 선 + 호버 하이라이트
+// ──────────────────────────────────────────────────────────
+int32 ULRInventoryGridWidget::NativePaint(
+	const FPaintArgs& Args, const FGeometry& AllottedGeometry,
+	const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
+	int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+{
+	const int32 Result = Super::NativePaint(
+		Args, AllottedGeometry, MyCullingRect, OutDrawElements,
+		LayerId, InWidgetStyle, bParentEnabled);
+
+	if (!GridComponent) return Result;
+
+	const int32 Cols = GridComponent->GridWidth;
+	const int32 Rows = GridComponent->GridHeight;
+
+	FVector2D Origin = FVector2D::ZeroVector;
+	if (GridCanvas)
+		Origin = AllottedGeometry.AbsoluteToLocal(GridCanvas->GetCachedGeometry().GetAbsolutePosition());
+
+	// ── 그리드 선 ────────────────────────────────────────
+	for (int32 Col = 0; Col <= Cols; ++Col)
+	{
+		const float X = Origin.X + Col * SlotSize;
+		TArray<FVector2D> Pts = { FVector2D(X, Origin.Y), FVector2D(X, Origin.Y + Rows * SlotSize) };
+		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1,
+			AllottedGeometry.ToPaintGeometry(), Pts,
+			ESlateDrawEffect::None, GridLineColor, true, 1.f);
+	}
+	for (int32 Row = 0; Row <= Rows; ++Row)
+	{
+		const float Y = Origin.Y + Row * SlotSize;
+		TArray<FVector2D> Pts = { FVector2D(Origin.X, Y), FVector2D(Origin.X + Cols * SlotSize, Y) };
+		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1,
+			AllottedGeometry.ToPaintGeometry(), Pts,
+			ESlateDrawEffect::None, GridLineColor, true, 1.f);
+	}
+
+	// ── 호버 셀 하이라이트 ───────────────────────────────
+	if (HoveredCell.X >= 0)
+	{
+		const FVector2D TL(
+			Origin.X + HoveredCell.X * SlotSize,
+			Origin.Y + HoveredCell.Y * SlotSize);
+
+		// 속이 찬 반투명 흰색 박스 (사각형 4변)
+		TArray<FVector2D> Box = {
+			TL,
+			FVector2D(TL.X + SlotSize, TL.Y),
+			FVector2D(TL.X + SlotSize, TL.Y + SlotSize),
+			FVector2D(TL.X,            TL.Y + SlotSize),
+			TL
+		};
+		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2,
+			AllottedGeometry.ToPaintGeometry(), Box,
+			ESlateDrawEffect::None, FLinearColor(1.f, 1.f, 1.f, 0.35f), true, 2.f);
+	}
+
+	return Result;
+}
+
+// ──────────────────────────────────────────────────────────
+// NativeOnMouseButtonDown — 클릭한 셀의 아이템 확인 후 드래그 준비
+// 아이템 위젯은 HitTestInvisible이므로 그리드 위젯이 직접 처리
+// ──────────────────────────────────────────────────────────
+FReply ULRInventoryGridWidget::NativeOnMouseButtonDown(
+	const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (!GridComponent) return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+
+	FVector2D LocalPx = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
+	LocalPx -= GetGridCanvasOrigin(InGeometry);
+
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		const FIntPoint Cell = GetGridIndexFromMouse(LocalPx);
+		const int32 HitItemID = GridComponent->GetItemIDAt(Cell.X, Cell.Y);
+
+		if (HitItemID != INDEX_NONE)
+		{
+			if (InMouseEvent.IsShiftDown())
+			{
+				// Shift+클릭: 빠른 전송
+				if (StorageGrid)
+				{
+					const FLRGridItem& Item = GridComponent->GetItems()[HitItemID];
+					int32 OutX, OutY; bool bRot;
+					if (StorageGrid->FindEmptySpace(Item, OutX, OutY, bRot))
+					{
+						GridComponent->RemoveItem(HitItemID);
+						StorageGrid->PlaceItem(OutX, OutY, Item, bRot);
+					}
+				}
+				return FReply::Handled();
+			}
+
+			// 드래그 감지 준비 — 아이템 내 클릭 위치(슬롯 단위) 기록
+			const FLRGridItem& Item = GridComponent->GetItems()[HitItemID];
+			const FVector2D ItemOriginPx = GridToLocal(Item.GridX, Item.GridY);
+			GrabOffsetSlots = (LocalPx - ItemOriginPx) / SlotSize;
+			PendingDragItemID = HitItemID;
+
+			UE_LOG(LogTemp, Warning, TEXT("[Grid] MouseButtonDown — ItemID: %d Cell: (%d,%d)"),
+				HitItemID, Cell.X, Cell.Y);
+
+			return FReply::Handled().DetectDrag(TakeWidget(), EKeys::LeftMouseButton);
+		}
+	}
+
+	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+	{
+		const FIntPoint Cell = GetGridIndexFromMouse(LocalPx);
+		const int32 HitItemID = GridComponent->GetItemIDAt(Cell.X, Cell.Y);
+		if (HitItemID != INDEX_NONE)
+			GridComponent->UseItem(HitItemID);
+		return FReply::Handled();
+	}
+
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply ULRInventoryGridWidget::NativeOnMouseButtonUp(
+	const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	PendingDragItemID = INDEX_NONE;
+	return FReply::Handled();
+}
+
+// ──────────────────────────────────────────────────────────
+// NativeOnDragDetected — DragDropOperation 생성
+// ──────────────────────────────────────────────────────────
+void ULRInventoryGridWidget::NativeOnDragDetected(
+	const FGeometry& InGeometry, const FPointerEvent& InMouseEvent,
+	UDragDropOperation*& OutOperation)
+{
+	if (PendingDragItemID == INDEX_NONE || !GridComponent) return;
+
+	const TMap<int32, FLRGridItem>& Items = GridComponent->GetItems();
+	if (!Items.Contains(PendingDragItemID)) return;
+
+	const FLRGridItem DraggedItemData = Items[PendingDragItemID];
+
+	ULRItemDragDropOperation* Op = NewObject<ULRItemDragDropOperation>(this);
+	Op->DraggedItem     = DraggedItemData;
+	Op->SourceGrid      = GridComponent;
+	Op->SourceItemID    = PendingDragItemID;
+	Op->GrabOffsetSlots = GrabOffsetSlots;
+	Op->Pivot           = EDragPivot::MouseDown;
+
+	// UImage + FSlateBrush.ImageSize → 아이템 실제 픽셀 크기로 드래그 비주얼 생성
+	UImage* DragImage = NewObject<UImage>(GetOwningPlayer());
+	{
+		FSlateBrush Brush;
+		if (DraggedItemData.ItemData && DraggedItemData.ItemData->ItemIcon)
+			Brush.SetResourceObject(DraggedItemData.ItemData->ItemIcon);
+		Brush.ImageSize = FVector2D(
+			DraggedItemData.GetEffectiveWidth()  * SlotSize,
+			DraggedItemData.GetEffectiveHeight() * SlotSize);
+		DragImage->SetBrush(Brush);
+	}
+	Op->DefaultDragVisual = DragImage;
+
+	GridComponent->RemoveItem(PendingDragItemID);
+	PendingDragItemID = INDEX_NONE;
+
+	UE_LOG(LogTemp, Warning, TEXT("[Grid] DragDetected — %s"),
+		DraggedItemData.ItemData ? *DraggedItemData.ItemData->GetName() : TEXT("?"));
+
+	OutOperation = Op;
+}
+
+// ──────────────────────────────────────────────────────────
+// NativeOnMouseMove — 호버 셀 갱신
+// ──────────────────────────────────────────────────────────
+FReply ULRInventoryGridWidget::NativeOnMouseMove(
+	const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (GridComponent)
+	{
+		FVector2D LocalPx = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
+		LocalPx -= GetGridCanvasOrigin(InGeometry);
+
+		const FIntPoint Cell(
+			FMath::FloorToInt(LocalPx.X / SlotSize),
+			FMath::FloorToInt(LocalPx.Y / SlotSize));
+
+		const bool bInBounds =
+			Cell.X >= 0 && Cell.X < GridComponent->GridWidth &&
+			Cell.Y >= 0 && Cell.Y < GridComponent->GridHeight;
+
+		const FIntPoint Next = bInBounds ? Cell : FIntPoint(-1, -1);
+		if (Next != HoveredCell)
+		{
+			HoveredCell = Next;
+			Invalidate(EInvalidateWidgetReason::Paint);
+		}
+	}
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+void ULRInventoryGridWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	if (HoveredCell.X >= 0)
+	{
+		HoveredCell = FIntPoint(-1, -1);
+		Invalidate(EInvalidateWidgetReason::Paint);
+	}
+	Super::NativeOnMouseLeave(InMouseEvent);
+}
+
+// ──────────────────────────────────────────────────────────
+// RebuildGrid
 // ──────────────────────────────────────────────────────────
 void ULRInventoryGridWidget::RebuildGrid()
 {
-	if (!GridCanvas || !GridComponent || !ItemWidgetClass) return;
+	if (!GridCanvas)      { UE_LOG(LogTemp, Error, TEXT("[Grid] GridCanvas null")); return; }
+	if (!GridComponent)   { UE_LOG(LogTemp, Error, TEXT("[Grid] GridComponent null")); return; }
+	if (!ItemWidgetClass) { UE_LOG(LogTemp, Error, TEXT("[Grid] ItemWidgetClass null")); return; }
 
-	// 기존 아이템 위젯 모두 제거 (프리뷰는 유지)
+	UE_LOG(LogTemp, Warning, TEXT("[Grid] RebuildGrid — 아이템 수: %d"), GridComponent->GetItems().Num());
+
 	TArray<UWidget*> Children = GridCanvas->GetAllChildren();
 	for (UWidget* Child : Children)
 	{
@@ -73,13 +296,15 @@ void ULRInventoryGridWidget::RebuildGrid()
 			Child->RemoveFromParent();
 	}
 
-	// 아이템마다 위젯 생성 및 배치
 	for (auto& [ID, Item] : GridComponent->GetItems())
 	{
 		ULRItemWidget* ItemWidget = CreateWidget<ULRItemWidget>(this, ItemWidgetClass);
 		if (!ItemWidget) continue;
 
 		ItemWidget->Init(Item, ID, GridComponent, StorageGrid, SlotSize);
+
+		// 입력은 그리드 위젯이 처리하므로 아이템 위젯은 렌더링만 담당
+		ItemWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
 
 		UCanvasPanelSlot* CanvasSlot = GridCanvas->AddChildToCanvas(ItemWidget);
 		if (CanvasSlot)
@@ -103,16 +328,15 @@ bool ULRInventoryGridWidget::NativeOnDragOver(
 	ULRItemDragDropOperation* Op = Cast<ULRItemDragDropOperation>(InOperation);
 	if (!Op || !GridComponent) return false;
 
-	// 마우스 위치 → 위젯 로컬 픽셀 좌표
-	FVector2D LocalPx = InGeometry.AbsoluteToLocal(
-		InDragDropEvent.GetScreenSpacePosition());
-
-	// GrabOffset을 빼서 아이템 좌상단 기준으로 보정
+	FVector2D LocalPx = InGeometry.AbsoluteToLocal(InDragDropEvent.GetScreenSpacePosition());
+	LocalPx -= GetGridCanvasOrigin(InGeometry);
 	LocalPx -= Op->GrabOffsetSlots * SlotSize;
 
 	const FIntPoint GridPos = GetGridIndexFromMouse(LocalPx);
 	const bool bCanPlace = GridComponent->CheckPlacement(
 		GridPos.X, GridPos.Y, Op->DraggedItem, Op->DraggedItem.bIsRotated);
+
+	UE_LOG(LogTemp, Verbose, TEXT("[Grid] DragOver (%d,%d) CanPlace=%d"), GridPos.X, GridPos.Y, bCanPlace);
 
 	ShowPreview(GridPos.X, GridPos.Y, Op->DraggedItem, bCanPlace);
 	return true;
@@ -130,26 +354,26 @@ bool ULRInventoryGridWidget::NativeOnDrop(
 	ULRItemDragDropOperation* Op = Cast<ULRItemDragDropOperation>(InOperation);
 	if (!Op || !GridComponent) return false;
 
-	FVector2D LocalPx = InGeometry.AbsoluteToLocal(
-		InDragDropEvent.GetScreenSpacePosition());
+	FVector2D LocalPx = InGeometry.AbsoluteToLocal(InDragDropEvent.GetScreenSpacePosition());
+	LocalPx -= GetGridCanvasOrigin(InGeometry);
 	LocalPx -= Op->GrabOffsetSlots * SlotSize;
 
 	const FIntPoint GridPos = GetGridIndexFromMouse(LocalPx);
-	const bool bRotated     = Op->DraggedItem.bIsRotated;
+	const bool bRotated = Op->DraggedItem.bIsRotated;
+	const bool bCanPlace = GridComponent->CheckPlacement(GridPos.X, GridPos.Y, Op->DraggedItem, bRotated);
 
-	if (!GridComponent->CheckPlacement(GridPos.X, GridPos.Y, Op->DraggedItem, bRotated))
+	UE_LOG(LogTemp, Warning, TEXT("[Grid] NativeOnDrop — GridPos: (%d,%d) CanPlace: %s"),
+		GridPos.X, GridPos.Y, bCanPlace ? TEXT("YES") : TEXT("NO"));
+
+	if (!bCanPlace)
 	{
-		// 배치 불가 → 원위치 복원 (소스 그리드가 다를 수도 있으므로 소스에 복원)
 		if (Op->SourceGrid)
-		{
 			Op->SourceGrid->PlaceItem(
 				Op->DraggedItem.GridX, Op->DraggedItem.GridY,
 				Op->DraggedItem, bRotated);
-		}
 		return false;
 	}
 
-	// 타겟 그리드에 배치 (소스에서는 이미 DragDetected 시점에 제거됨)
 	GridComponent->PlaceItem(GridPos.X, GridPos.Y, Op->DraggedItem, bRotated);
 	return true;
 }
@@ -165,7 +389,6 @@ void ULRInventoryGridWidget::NativeOnDragCancelled(
 {
 	HidePreview();
 
-	// 드롭 취소 시 소스 위치에 원복
 	ULRItemDragDropOperation* Op = Cast<ULRItemDragDropOperation>(InOperation);
 	if (Op && Op->SourceGrid)
 	{
@@ -201,7 +424,6 @@ void ULRInventoryGridWidget::ShowPreview(
 	UCanvasPanelSlot* PreviewCanvasSlot = Cast<UCanvasPanelSlot>(PreviewWidget->Slot);
 	if (PreviewCanvasSlot)
 	{
-		// 그리드 좌표에 스냅된 픽셀 위치로 이동
 		PreviewCanvasSlot->SetPosition(GridToLocal(GridX, GridY));
 		PreviewCanvasSlot->SetSize(FVector2D(
 			Item.GetEffectiveWidth()  * SlotSize,

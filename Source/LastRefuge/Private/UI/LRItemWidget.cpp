@@ -32,6 +32,8 @@ void ULRItemWidget::Init(const FLRGridItem& InItem, int32 InItemID,
 FReply ULRItemWidget::NativeOnMouseButtonDown(
 	const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[Item] MouseButtonDown — %s"), *GetName());
+
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 	{
 		if (InMouseEvent.IsShiftDown())
@@ -73,19 +75,49 @@ void ULRItemWidget::NativeOnDragDetected(
 	const FGeometry& InGeometry, const FPointerEvent& InMouseEvent,
 	UDragDropOperation*& OutOperation)
 {
-	ULRItemDragDropOperation* Op = NewObject<ULRItemDragDropOperation>(this);
-	Op->DraggedItem      = GridItem;
-	Op->SourceGrid       = SourceGridComponent;
-	Op->SourceItemID     = ItemID;
-	Op->GrabOffsetSlots  = GrabOffsetSlots;
-	Op->DefaultDragVisual = this;
-	Op->Pivot            = EDragPivot::MouseDown;
+	UE_LOG(LogTemp, Warning, TEXT("[Item] DragDetected 시작 — %s"), *GetName());
 
-	// 드래그 시작 시 소스에서 제거 (드롭 취소 시 NativeOnDragCancelled에서 복원)
+	ULRItemDragDropOperation* Op = NewObject<ULRItemDragDropOperation>(this);
+	Op->DraggedItem     = GridItem;
+	Op->SourceGrid      = SourceGridComponent;
+	Op->SourceItemID    = ItemID;
+	Op->GrabOffsetSlots = GrabOffsetSlots;
+	Op->Pivot           = EDragPivot::MouseDown;
+
+	// ULRItemWidget은 루트 캔버스 DesiredSize=0이라 드래그 비주얼이 안 보임.
+	// UImage에 FSlateBrush.ImageSize를 명시하면 SImage의 DesiredSize가 아이템 크기가 됨.
+	UImage* DragImage = NewObject<UImage>(GetOwningPlayer());
+	{
+		FSlateBrush Brush;
+		if (GridItem.ItemData && GridItem.ItemData->ItemIcon)
+			Brush.SetResourceObject(GridItem.ItemData->ItemIcon);
+		Brush.ImageSize = FVector2D(
+			GridItem.GetEffectiveWidth()  * SlotSize,
+			GridItem.GetEffectiveHeight() * SlotSize);
+		DragImage->SetBrush(Brush);
+	}
+	Op->DefaultDragVisual = DragImage;
+
+	// 소스 그리드에서 제거 (드롭 취소 시 NativeOnDragCancelled에서 복원)
 	if (SourceGridComponent)
 		SourceGridComponent->RemoveItem(ItemID);
 
 	OutOperation = Op;
+}
+
+// ──────────────────────────────────────────────────────────
+// NativeOnDragCancelled — 아이템 그리드 밖에서 드롭 취소 시 원위치 복원
+// ──────────────────────────────────────────────────────────
+void ULRItemWidget::NativeOnDragCancelled(
+	const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	ULRItemDragDropOperation* Op = Cast<ULRItemDragDropOperation>(InOperation);
+	if (Op && Op->SourceGrid)
+	{
+		Op->SourceGrid->PlaceItem(
+			Op->DraggedItem.GridX, Op->DraggedItem.GridY,
+			Op->DraggedItem, Op->DraggedItem.bIsRotated);
+	}
 }
 
 // ──────────────────────────────────────────────────────────

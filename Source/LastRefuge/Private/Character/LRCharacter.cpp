@@ -189,6 +189,8 @@ void ALRCharacter::Move(const FInputActionValue& Value)
 
 void ALRCharacter::Look(const FInputActionValue& Value)
 {
+    if (bIgnoreLookInput) return;
+
     const FVector2D LookVector = Value.Get<FVector2D>();
     if (Controller)
     {
@@ -353,7 +355,17 @@ void ALRCharacter::Tick(float DeltaTime)
     }
 
     // --- 상호작용 프롬프트 (조준 중인 오브젝트 표시) ---
-    if (!bIsSearching && Controller)
+    // 보관함이 열려 있으면 "E: 보관함 닫기" 고정 표시
+    if (bStorageOpen)
+    {
+        FText CloseText = FText::FromString(TEXT("[E] 보관함 닫기"));
+        if (!CloseText.EqualTo(CurrentPromptText))
+        {
+            CurrentPromptText = CloseText;
+            OnInteractionPromptChanged.Broadcast(CurrentPromptText);
+        }
+    }
+    else if (!bIsSearching && !bInventoryOpen && Controller)
     {
         FVector Start;
         FRotator Rotation;
@@ -511,6 +523,9 @@ void ALRCharacter::CancelSearch()
 
 void ALRCharacter::ToggleInventory()
 {
+    // 보관함이 열려 있으면 인벤토리를 열지 않음
+    if (bStorageOpen) return;
+
     UE_LOG(LogTemp, Warning, TEXT("[Inventory] ToggleInventory 호출됨"));
 
     if (!InventoryWidgetClass)
@@ -531,24 +546,26 @@ void ALRCharacter::ToggleInventory()
         if (!InventoryWidget)
         {
             InventoryWidget = CreateWidget<ULRInventoryGridWidget>(PC, InventoryWidgetClass);
-            if (InventoryWidget)
-            {
-                InventoryWidget->InitGrid(InventoryGrid, nullptr);
-                UE_LOG(LogTemp, Warning, TEXT("[Inventory] 위젯 생성 완료"));
-            }
-            else
+            if (!InventoryWidget)
             {
                 UE_LOG(LogTemp, Error, TEXT("[Inventory] CreateWidget 실패"));
                 return;
             }
+            constexpr float SlotSizePx = 50.f;
+            InventoryWidget->InitGrid(InventoryGrid, nullptr, SlotSizePx);
+            UE_LOG(LogTemp, Warning, TEXT("[Inventory] 위젯 생성 완료"));
         }
-        if (InventoryWidget)
+
+        InventoryWidget->AddToViewport(5);
+        PC->SetShowMouseCursor(true);
         {
-            InventoryWidget->AddToViewport(5);
-            PC->SetShowMouseCursor(true);
-            PC->SetInputMode(FInputModeGameAndUI());
-            UE_LOG(LogTemp, Warning, TEXT("[Inventory] 열림"));
+            FInputModeGameAndUI Mode;
+            Mode.SetHideCursorDuringCapture(false);
+            PC->SetInputMode(Mode);
         }
+        PC->SetIgnoreMoveInput(true);
+        bIgnoreLookInput = true;
+        UE_LOG(LogTemp, Warning, TEXT("[Inventory] 열림"));
     }
     else
     {
@@ -557,6 +574,8 @@ void ALRCharacter::ToggleInventory()
             InventoryWidget->RemoveFromParent();
             PC->SetShowMouseCursor(false);
             PC->SetInputMode(FInputModeGameOnly());
+            PC->ResetIgnoreMoveInput();
+            bIgnoreLookInput = false;
         }
     }
 
@@ -593,7 +612,13 @@ void ALRCharacter::OpenStorageScreen(ULRInventoryGridComponent* InStorageGrid)
     StorageWidget->AddToViewport(5);
 
     PC->SetShowMouseCursor(true);
-    PC->SetInputMode(FInputModeGameAndUI());
+    {
+        FInputModeGameAndUI Mode;
+        Mode.SetHideCursorDuringCapture(false);
+        PC->SetInputMode(Mode);
+    }
+    PC->SetIgnoreMoveInput(true);
+    bIgnoreLookInput = true;
 
     bStorageOpen = true;
     UE_LOG(LogTemp, Warning, TEXT("[Storage] 보관함 UI 열림"));
@@ -604,13 +629,15 @@ void ALRCharacter::CloseStorageScreen()
     if (StorageWidget)
         StorageWidget->RemoveFromParent();
 
-    StorageWidget = nullptr;
-    bStorageOpen  = false;
+    StorageWidget    = nullptr;
+    bStorageOpen     = false;
+    bIgnoreLookInput = false;
 
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {
         PC->SetShowMouseCursor(false);
         PC->SetInputMode(FInputModeGameOnly());
+        PC->ResetIgnoreMoveInput();
     }
 
     UE_LOG(LogTemp, Warning, TEXT("[Storage] 보관함 UI 닫힘"));

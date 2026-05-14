@@ -47,6 +47,9 @@ protected:
 	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry,
 	                                      const FPointerEvent& InMouseEvent) override;
 
+	virtual void NativeOnDragCancelled(const FDragDropEvent& InDragDropEvent,
+	                                    UDragDropOperation* InOperation) override;
+
 private:
 	FLRGridItem GridItem;
 	int32 ItemID = INDEX_NONE;

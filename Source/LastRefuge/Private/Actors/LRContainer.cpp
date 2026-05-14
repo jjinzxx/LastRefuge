@@ -1,66 +1,81 @@
 #include "Actors/LRContainer.h"
 #include "Components/StaticMeshComponent.h"
 #include "Character/LRCharacter.h"
-#include "Components/LRInventoryComponent.h"
+#include "Components/LRInventoryGridComponent.h"
 #include "Items/LRItemDataAsset.h"
+#include "Items/LRInventoryStructs.h"
 
 ALRContainer::ALRContainer()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	// 간단한 메쉬 컴포넌트 추가
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	RootComponent = MeshComponent;
+
+	ContainerGrid = CreateDefaultSubobject<ULRInventoryGridComponent>(TEXT("ContainerGrid"));
+}
+
+void ALRContainer::BeginPlay()
+{
+	Super::BeginPlay();
+
+	UE_LOG(LogTemp, Warning, TEXT("[Container] BeginPlay — LootTable 수: %d"), LootTable.Num());
+
+	for (ULRItemDataAsset* ItemData : LootTable)
+	{
+		if (!ItemData) continue;
+
+		FLRGridItem NewItem;
+		NewItem.ItemData = ItemData;
+		NewItem.Width    = ItemData->GridWidth;
+		NewItem.Height   = ItemData->GridHeight;
+
+		int32 OutX, OutY;
+		bool bOutRotated;
+		if (ContainerGrid->FindEmptySpace(NewItem, OutX, OutY, bOutRotated))
+		{
+			ContainerGrid->PlaceItem(OutX, OutY, NewItem, bOutRotated);
+			UE_LOG(LogTemp, Warning, TEXT("[Container] 아이템 배치: %s → (%d,%d)"), *ItemData->ItemName.ToString(), OutX, OutY);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("[Container] 공간 없음: %s"), *ItemData->ItemName.ToString());
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[Container] ContainerGrid 아이템 수: %d"), ContainerGrid->GetItems().Num());
 }
 
 void ALRContainer::BeginInteract(ALRCharacter* Player)
 {
 	if (bSearched) return;
 
-	// (사운드 재생 등을 여기서 처리할 수 있음)
-	UE_LOG(LogTemp, Log, TEXT("컨테이너: 플레이어가 수색을 시작했습니다."));
+	UE_LOG(LogTemp, Log, TEXT("컨테이너: 수색 시작"));
 }
 
 void ALRContainer::EndInteract(ALRCharacter* Player)
 {
-	// Player가 nullptr로 넘어오면 취소된 것, 유효하면 수색 성공
 	if (Player == nullptr)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("컨테이너: 수색이 중간에 취소되었습니다."));
+		UE_LOG(LogTemp, Warning, TEXT("컨테이너: 수색 취소"));
 		return;
 	}
 
-	if (!bSearched)
-	{
-		bSearched = true; // 다시 못 뒤지게 막기
-
-		// 플레이어의 인벤토리 컴포넌트 찾기
-		ULRInventoryComponent* Inventory = Player->FindComponentByClass<ULRInventoryComponent>();
-		if (Inventory)
-		{
-			// 에디터에서 설정한 LootTable의 아이템들을 인벤토리에 추가
-			for (const FLRItemSlot& Loot : LootTable)
-			{
-				if (Loot.ItemData && Loot.Quantity > 0)
-				{
-					Inventory->AddItem(Loot.ItemData, Loot.Quantity);
-					UE_LOG(LogTemp, Log, TEXT("컨테이너: 아이템 획득 - %s x %d"), *Loot.ItemData->GetName(), Loot.Quantity);
-				}
-			}
-		}
-
-		UE_LOG(LogTemp, Warning, TEXT("컨테이너: 수색 완료 및 아이템 획득 성공!"));
-	}
+	bSearched = true;
+	Player->OpenStorageScreen(ContainerGrid);
 }
 
 float ALRContainer::GetInteractionDuration() const
 {
+	// 수색 완료 후 재접근 시 즉시 열기
 	return bSearched ? 0.f : SearchDuration;
 }
 
 FText ALRContainer::GetInteractionPrompt() const
 {
-	return bSearched ? FText::FromString(TEXT("이미 수색함")) : FText::FromString(TEXT("[E] 열기"));
+	return bSearched
+		? FText::FromString(TEXT("[E] 다시 열기"))
+		: FText::FromString(TEXT("[E] 열기"));
 }
 
 FText ALRContainer::GetProgressText() const

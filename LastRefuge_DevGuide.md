@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 12 완료)
+# Last Refuge - 개발 인수인계 문서 (Day 13 완료)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -34,23 +34,24 @@
 ```text
 Content/
 └── LR/
-    ├── Blueprints/      # BP_LRCharacter, BP_LRBot, BP_LRGameMode, BP_LRContainer (Day 9), BP_LRStorage (Day 10), BP_LRDoor (Day 11)
-    ├── UI/              # WBP_LRHud (Day 12)
+    ├── Blueprints/      # BP_LRCharacter, BP_LRBot, BP_LRGameMode, BP_LRContainer, BP_LRStorage, BP_LRDoor
+    ├── UI/              # WBP_LRHud, WBP_InventoryGrid, WBP_Storage, WBP_LRItem, WBP_DragPreview
     ├── Characters/
-    ├── DataAssets/      # 아이템 데이터 에셋
-    ├── Input/           # IMC_Default, IA_Move, IA_Look, IA_Jump, IA_Crouch, IA_Sprint, IA_Interact (Day 9)
-    ├── Maps/            # L_Day1Test → L_Day11_Blockout (Day 11)
-    ├── AI/              # BT_LRBot, BB_LRBot
-    └── UI/
+    ├── DataAssets/      # DA_Scrap, DA_Medkit, DA_Ration (ItemID, GridWidth, GridHeight 설정 필요)
+    ├── Input/           # IMC_Default, IA_Move, IA_Look, IA_Jump, IA_Crouch, IA_Sprint, IA_Interact, IA_Inventory
+    ├── Maps/            # L_Base, L_DangerZone
+    └── AI/              # BT_LRBot, BB_LRBot
 
 Source/LastRefuge/
 ├── Public/
 │   ├── Character/       # LRCharacter.h
 │   ├── AI/              # LRBot.h, LRBotAIController.h, BTTask_LRSelectNextPatrolPoint.h, BTTask_LRSuspiciousScan.h
-│   ├── Components/      # LRStatusComponent.h, LRInventoryComponent.h
-│   ├── Interfaces/      # LRInteractable.h (GetInteractionPrompt, GetProgressText, GetStartText, GetCancelText, GetCompleteText)
-│   ├── Items/           # LRItemDataAsset.h, LRInventoryStructs.h, LRContainer.h (Day 9), LRStorage.h (Day 10), LRDoor.h (Day 11)
-│   └── UI/              # LRHudWidget.h (Day 12)
+│   ├── Components/      # LRStatusComponent.h, LRInventoryGridComponent.h (Day 13 신규, 구 LRInventoryComponent 대체)
+│   ├── Interfaces/      # LRInteractable.h
+│   ├── Items/           # LRItemDataAsset.h, LRInventoryStructs.h
+│   ├── Actors/          # LRContainer.h, LRStorage.h, LRDoor.h  ← Day 13: Items/에서 이동
+│   └── UI/              # LRHudWidget.h, LRInventoryGridWidget.h, LRItemWidget.h,
+│                        #   LRDragPreviewWidget.h, LRItemDragDropOperation.h, LRStorageWidget.h
 └── Private/
     └── (동일 구조)
 ```
@@ -60,42 +61,124 @@ Source/LastRefuge/
 ## 완성된 클래스 및 현재 상태
 
 ### ALRCharacter (Character/LRCharacter.h/.cpp)
-플레이어 캐릭터 클래스.
 - 1인칭 카메라 및 Enhanced Input 기반 이동/시점/점프
 - 자세 시스템 (Crouch / Walk / Run) 및 스테미나/소음 연동
-- 사망 시 GameMode와 연동 (`OnPlayerDied`)
-- **[Day 9]** 전방 LineTrace 기반 상호작용 탐색 (`TryInteract`) 및 수색 타이머 시스템
-- **[Day 9]** 이동, 점프 시 수색 인터럽트 처리 (`CancelSearch`)
-- **[Day 10]** 피격 시 수색 인터럽트 (`TakeDamage`에서 `CancelSearch` 호출)
-- **[Day 11]** Tick에서 조준 중인 `ILRInteractable`의 프롬프트 텍스트를 화면에 표시
-- **[Day 12]** `OnSearchStarted` / `OnSearchEnded` / `OnSearchProgressChanged` / `OnInteractionPromptChanged` 델리게이트 추가 및 브로드캐스트
-- **[Day 12]** 완료 시 `GetCompleteText()`, 취소 시 `GetCancelText()` 오브젝트별 텍스트 전달
+- **[Day 9]** 전방 LineTrace 기반 상호작용 탐색 + 수색 타이머
+- **[Day 12]** 델리게이트 브로드캐스트 (OnSearchStarted/Ended/ProgressChanged/InteractionPromptChanged)
+- **[Day 13]** `ULRInventoryGridComponent* InventoryGrid` (구 ULRInventoryComponent 대체)
+- **[Day 13]** `IA_Inventory` (Tab) → `ToggleInventory()`: WBP_InventoryGrid 생성/제거
+- **[Day 13]** `OpenStorageScreen(ULRInventoryGridComponent*)` / `CloseStorageScreen()`: WBP_Storage 생성/제거
+- **[Day 13]** BeginPlay에서 `GI->PersistentInventory` (FLRGridItem 배열)로 인벤 복원
 
-### ULRHudWidget (UI/LRHudWidget.h/.cpp) — Day 12 신규
-- `UUserWidget` 기반 C++ HUD 클래스. `WBP_LRHud`의 부모 클래스로 지정.
-- **BindWidget**: `PB_HP`, `PB_Stamina`, `PB_Noise`, `TB_Prompt` (필수 바인딩)
-- **BindWidgetOptional**: `PB_Search` (텍스트 애니메이션으로 대체되어 블루프린트에서 제거)
-- `NativeTick`에서 노이즈 바 폴링 + 점 애니메이션 (`수색중.` / `수색중..` / `수색중...`) 0.4초 간격
-- 완료 시 오브젝트별 텍스트 표시 (`수색완료` / `이동완료`), 2초 후 자동 숨김
-- 취소 시 오브젝트별 텍스트 표시 (`수색이 취소되었습니다.` / `이동이 취소되었습니다.`)
+### ULRInventoryGridComponent (Components/LRInventoryGridComponent.h/.cpp) — Day 13 신규
+타르코프 스타일 10×5 그리드 인벤토리 컴포넌트.
+- 내부: `TArray<int32> Grid` (1D, [y*W+x] = ItemID), `TMap<int32, FLRGridItem> Items`
+- `CheckPlacement(X, Y, Item, bRotated)`: 경계 + 셀 겹침 검사
+- `PlaceItem(X, Y, Item, bRotated)`: NextItemID++ 방식으로 셀 채움
+- `RemoveItem(ItemID)`: ID 기반 제거, 인덱스 재정렬 없음
+- `FindEmptySpace(Item, OutX, OutY, bOutRotated)`: First-fit, 원본→회전 순 시도
+- `UseItem(ItemID)`: Consumable 타입이면 StatusComponent에 효과 적용
+- `FOnGridChanged OnGridChanged` 델리게이트: 데이터 변경 시 UI 자동 리빌드 트리거
 
-### ULRInventoryComponent & 아이템 시스템 (Day 8 완비)
-- `ULRItemDataAsset`: 아이템 정보(Resource, Consumable 등), 회복 수치 관리.
-- `AddItem` / `RemoveItem`: 수량 기반 중첩 및 배열 관리.
-- `UseItem` + `ApplyItemEffects`: 소모품 사용 및 스탯 회복 (구현 완료).
-- **[Day 10]** `GetInventorySlots()` / `ClearInventory()` 추가.
+### 그리드 인벤토리 UI (UI/) — Day 13 신규
 
-### 상호작용 시스템 (Day 12 완비)
-- **`ILRInteractable`**: `BeginInteract`, `EndInteract`, `GetInteractionDuration`, `GetInteractionPrompt`, `GetProgressText`, `GetStartText`, `GetCancelText`, **[Day 12] `GetCompleteText()`** 추가.
-- **`ALRContainer`**: 수색 완료 시 `LootTable` 아이템 지급. `bSearched` 플래그로 재수색 방지. 프롬프트: `[E] 열기` / `이미 수색함`. 완료 텍스트: `수색완료`.
-- **`ALRDoor`**: 레벨 이동 액터. `InteractionDuration=5초`, `TargetLevel` 설정. 이동 전 인벤토리/보관함 GameInstance에 저장. 완료 텍스트: `이동완료`.
+| 클래스 | 역할 |
+|---|---|
+| `ULRInventoryGridWidget` | 그리드 전체. `UCanvasPanel* GridCanvas` (BindWidget). DragOver/Drop/Leave/Cancelled 처리. `RebuildGrid()`로 아이템 위젯 재생성 |
+| `ULRItemWidget` | 개별 아이템 슬롯. 좌클릭=드래그, 우클릭=UseItem, Shift+좌클릭=QuickTransfer |
+| `ULRDragPreviewWidget` | 드래그 중 미리보기. 녹색(배치 가능) / 빨간색(불가) 하이라이트 |
+| `ULRItemDragDropOperation` | 드래그 데이터: `DraggedItem`, `SourceGrid`, `SourceItemID`, `GrabOffsetSlots` |
 
-### 보관함 및 사망 처리 (Day 10 완비)
-- **`ALRStorage`**: 기지 보관함 액터. `ILRInteractable` 구현, 즉시 상호작용(duration=0). 아이템 있으면 **Deposit**, 없으면 **Withdraw**. `BeginPlay`에서 `GameInstance`로부터 보관함 복원. 프롬프트: `[E] 저장하기` / `[E] 꺼내기`.
-- **사망 처리**: `ALRGameMode::RespawnLevelName` 설정 시 해당 레벨로 이동(인벤 초기화), 미설정 시 제자리 리스폰.
+**그리드 좌표 변환:**
+- `GetGridIndexFromMouse(LocalPx)` = `FloorToInt(LocalPx / SlotSize)`
+- `GridToLocal(X, Y)` = `(X * SlotSize, Y * SlotSize)`
+- DragOver 스냅: `LocalPx -= GrabOffsetSlots * SlotSize` → 그리드 인덱스 계산
 
-### AI 시스템 (Day 6 완비)
-- 감지(Perception), 순찰(Patrol), 의심(Suspicious), 전투(Combat) 상태 머신 완료.
+### ULRStorageWidget (UI/LRStorageWidget.h/.cpp) — Day 13 신규
+보관함 열기 시 표시되는 분할 화면 위젯 (인벤토리 좌 + 창고 우).
+- **BindWidget**: `UCanvasPanel* InventoryContainer`, `UCanvasPanel* StorageContainer`
+- `TSubclassOf<ULRInventoryGridWidget> GridWidgetClass` (BP에서 WBP_InventoryGrid 할당)
+- `InitStorage(InvGrid, InStorageGrid)`: 런타임에 ULRInventoryGridWidget 두 인스턴스 생성,
+  각 Container에 `AddChildToCanvas`, Anchor (0,0→1,1), Offset 0으로 채움
+- WBP_Storage Designer: Canvas Panel 2개(`InventoryContainer`, `StorageContainer`)만 배치.
+  WBP_InventoryGrid 직접 배치 금지 (C++에서 동적 생성)
+
+### ULRSaveGame (LRSaveGame.h/.cpp) — Day 13 신규
+- SlotName: `"LRInventorySave"`
+- `Save(InvGrid, StorageGrid, WorldCtx)`: 두 그리드 직렬화 → `TArray<FLRSavedItem>`
+- `Load(InvGrid, StorageGrid, ItemRegistry, WorldCtx)`: 그리드 초기화 후 복원. 배치 충돌 시 FindEmptySpace 폴백
+
+### FLRGridItem / FLRSavedItem (Items/LRInventoryStructs.h) — Day 13 수정
+```cpp
+USTRUCT() FLRGridItem {
+    ULRItemDataAsset* ItemData;
+    int32 GridX, GridY;
+    int32 Width, Height;          // 아이템 고유 크기
+    bool bIsRotated;
+    int32 GetEffectiveWidth()  const;  // bIsRotated ? Height : Width
+    int32 GetEffectiveHeight() const;
+    bool IsEmpty() const;
+};
+USTRUCT() FLRSavedItem {
+    FString ItemID;               // ULRItemDataAsset::ItemID
+    int32 GridX, GridY;
+    bool bIsRotated, bIsStorage;
+};
+```
+
+### ULRItemDataAsset — Day 13 수정
+- `FString ItemID` 추가 (고유 저장 키, DataAsset별로 수동 설정)
+- `int32 GridWidth = 1`, `int32 GridHeight = 1` 추가
+
+### ULRGameInstance — Day 13 수정
+- `TArray<FLRGridItem> PersistentInventory` / `PersistentStorageItems` (FLRItemSlot → FLRGridItem)
+- `TMap<FString, TObjectPtr<ULRItemDataAsset>> ItemRegistry`
+- `Init()` → `RegisterItemAssets()`: FSoftObjectPath::TryLoad()로 DataAsset 등록
+
+### ALRStorage (Actors/LRStorage.h/.cpp) — Day 13 수정
+- `ULRInventoryGridComponent* StorageGrid` 서브컴포넌트 추가
+- BeginPlay: `GI->PersistentStorageItems`에서 PlaceItem으로 복원
+- EndInteract: 전체 Deposit/Withdraw 방식 → `Player->OpenStorageScreen(StorageGrid)` 호출로 변경
+- 프롬프트: `[E] 보관함 열기`
+
+### ALRDoor (Actors/LRDoor.cpp) — Day 13 수정
+- 레벨 전환 전 인벤 저장: `GetInventoryGrid()->GetItems()` → FLRGridItem 배열
+- 보관함 저장: `StorageActor->GetStorageGrid()->GetItems()` → FLRGridItem 배열
+
+### ULRHudWidget (UI/LRHudWidget.h/.cpp) — Day 12 완비
+- HP/스테미나/소음 Progress Bar, 상호작용 프롬프트 텍스트
+- 수색 진행 점 애니메이션 (0.4초 간격), 완료/취소 텍스트 2초 표시
+
+---
+
+## 에디터 설정 체크리스트
+
+### Blueprint 서브클래스
+| Blueprint | 부모 클래스 | 추가 설정 |
+|---|---|---|
+| BP_LRCharacter | ALRCharacter | InventoryWidgetClass=WBP_InventoryGrid, StorageWidgetClass=WBP_Storage, IA_Inventory=IA_Inventory |
+| WBP_InventoryGrid | ULRInventoryGridWidget | ItemWidgetClass=WBP_LRItem, PreviewWidgetClass=WBP_DragPreview |
+| WBP_Storage | ULRStorageWidget | GridWidgetClass=WBP_InventoryGrid |
+| WBP_LRItem | ULRItemWidget | - |
+| WBP_DragPreview | ULRDragPreviewWidget | - |
+
+### DataAsset 설정 (DA_Scrap / DA_Medkit / DA_Ration)
+- `ItemID`: 고유 문자열 (예: `"Scrap"`, `"Medkit"`, `"Ration"`)
+- `GridWidth` / `GridHeight`: 그리드 점유 크기 설정
+
+### WBP_Storage Designer 구성
+```
+[Root] Canvas Panel
+├── Canvas Panel  →  변수명: InventoryContainer  (Anchor 0,0→0.5,1 / 좌측)
+└── Canvas Panel  →  변수명: StorageContainer    (Anchor 0.5,0→1,1 / 우측)
+```
+> WBP_InventoryGrid 인스턴스를 Designer에 직접 올리지 말 것. C++에서 런타임 생성.
+
+### WBP_InventoryGrid Designer 구성
+```
+[Root] Canvas Panel (루트)
+└── Canvas Panel  →  변수명: GridCanvas
+```
 
 ---
 
@@ -108,48 +191,34 @@ Source/LastRefuge/
 | Day 8 | 인벤토리 시스템 + 아이템 데이터 에셋 | ✅ 완료 |
 | Day 9 | 컨테이너 + 수색 게이지 + 인터럽트 로직 | ✅ 완료 |
 | Day 10 | 아이템 사용(스탯 회복) 구현 + 보관함 + 사망 처리 | ✅ 완료 |
-| Day 11 | **GetInteractionPrompt + 레벨 전환(ALRDoor) + GameInstance 인벤/보관함 영속** | ✅ 완료 |
-| Day 12 | **Minimum Viable HUD (ULRHudWidget, 점 애니메이션, 완료/취소 텍스트)** | ✅ 완료 |
-| Day 13 | **밸런싱 (60%) + 사운드 (30%) + 사전 빌드 (10%)** | ⬜ 미완료 |
-| Day 14 | **최종 빌드 + QA + 시연 영상** | ⬜ 미완료 |
+| Day 11 | GetInteractionPrompt + 레벨 전환(ALRDoor) + GameInstance 인벤/보관함 영속 | ✅ 완료 |
+| Day 12 | Minimum Viable HUD (ULRHudWidget, 점 애니메이션, 완료/취소 텍스트) | ✅ 완료 |
+| Day 13 | **타르코프 스타일 그리드 인벤토리 + 보관함 분할 UI** | ✅ 완료 |
+| Day 14 | **밸런싱 (60%) + 사운드 (30%) + 사전 빌드 (10%)** | ⬜ 미완료 |
+| Day 15 | **최종 빌드 + QA + 시연 영상** | ⬜ 미완료 |
 
 ---
 
-## Day 10 검증 결과 (완료)
+## Day 13 — 타르코프 스타일 그리드 인벤토리 (완료)
 
-1. ✅ **Deposit**: 아이템 보유 상태에서 보관함 E키 → 인벤토리 비워지고 로그 출력 확인.
-2. ✅ **Withdraw**: 빈 인벤토리 상태에서 보관함 E키 → 이전에 저장한 아이템 돌아옴 확인.
-3. ✅ **사망 후 보관함 유지**: 보관함에 저장 → 죽음 → 리스폰 → 보관함 E키 → 아이템 인출 확인.
-4. ✅ **피격 수색 인터럽트**: 수색 중 AI 피격 시 수색 즉시 취소 확인.
+### 구현 내용
+- **폴더 이동**: `Items/` → `Actors/` (LRContainer, LRStorage, LRDoor)
+- **ULRInventoryGridComponent**: 10×5 그리드, ID 기반 아이템 관리, 회전 지원
+- **드래그 앤 드롭**: ULRItemDragDropOperation, GrabOffsetSlots 기반 정밀 스냅
+- **배치 미리보기**: 녹색(가능)/빨간색(불가) 하이라이트
+- **Shift+클릭 빠른 이동**: FindEmptySpace로 반대편 그리드에 자동 배치
+- **보관함 분할 UI**: 인벤토리(좌) + 창고(우) 동시 표시, E키로 열기/닫기
+- **저장/불러오기**: ULRSaveGame (SlotName: LRInventorySave), FLRSavedItem 직렬화
+- **GameInstance 연동**: PersistentInventory/StorageItems를 FLRGridItem 배열로 교체
 
----
-
-## Day 11 — 레벨 전환 + 인터페이스 확장 (완료)
-
-- `ILRInteractable`에 `GetInteractionPrompt`, `GetProgressText`, `GetStartText`, `GetCancelText` 추가
-- `ALRDoor`: 레벨 이동 액터. 5초 대기 후 `OpenLevel`. 이동 전 인벤/보관함을 `ULRGameInstance`에 저장
-- `ULRGameInstance`: `PersistentInventory`, `PersistentStorageItems`, `bHasTravelData` (UPROPERTY로 GC 방지)
-- `ALRStorage::BeginPlay`: GameInstance에서 보관함 복원
-- `ALRCharacter::BeginPlay`: GameInstance에서 인벤토리 복원
-- `ALRGameMode`: `RespawnLevelName` — 사망 시 기지로 레벨 이동 + 인벤 초기화
-- 에디터: 두 맵(L_Base, L_DangerZone) 생성, NavMesh, ALRDoor 배치 완료
+### 알려진 미완성 항목
+- Tab키 인벤토리 열기: BP_LRCharacter의 `IA Inventory` 슬롯에 IA_Inventory 에셋 할당 필요
+- DataAsset ItemID / GridWidth / GridHeight 값 수동 설정 필요
+- GameInstance `RegisterItemAssets()` 내 Copy Reference 경로 실제 에셋 경로와 일치 여부 확인 필요
 
 ---
 
-## Day 12 — Minimum Viable HUD (완료)
-
-- `ULRHudWidget` C++ 클래스 (`UUserWidget` 상속)
-- **WBP_LRHud** 위젯 블루프린트 생성, 부모 클래스를 `LRHudWidget`으로 지정
-- **BP_LRCharacter** `HudWidgetClass`에 `WBP_LRHud` 할당
-- 위젯 구성: `PB_HP`(좌하단), `PB_Stamina`(좌하단), `PB_Noise`(중앙상단), `TB_Prompt`(중앙하단)
-- 점 애니메이션: `수색중.` / `수색중..` / `수색중...` — 0.4초 간격 NativeTick
-- 완료 텍스트: 오브젝트별 `GetCompleteText()` (`수색완료` / `이동완료`), 2초 후 숨김
-- 취소 텍스트: 오브젝트별 `GetCancelText()` (`수색이 취소되었습니다.` / `이동이 취소되었습니다.`)
-- `PB_Search`는 텍스트 애니메이션으로 대체 → `BindWidgetOptional` 처리
-
----
-
-## Day 13 — 밸런싱 + 사운드 + 사전 빌드
+## Day 14 — 밸런싱 + 사운드 + 사전 빌드
 
 ### 밸런싱 (60%)
 
@@ -169,7 +238,7 @@ Shipping 빌드 1회 패키징 → 실행 → 기본 루프 확인.
 
 ---
 
-## Day 14 — 최종 빌드 + QA + 시연 영상
+## Day 15 — 최종 빌드 + QA + 시연 영상
 
 시연 영상 컷: 타이틀(0~10s) → 잠입(10~30s) → 수색+인터럽트(30~50s) → 귀환+저장(50~70s) → 보관함 컷(70~90s)
 
@@ -179,18 +248,19 @@ Shipping 빌드 1회 패키징 → 실행 → 기본 루프 확인.
 
 | 리스크 | 대응 시점 | 대응 |
 |---|---|---|
-| Day 11 맵 6시간 초과 | Day 11 오후 | 분위기·디테일 포기 → Day 13으로 |
-| Day 12 인벤토리 UI 미완 | Day 12 저녁 | 슬롯 UI 생략, 키 입력만 유지 |
-| Day 13 밸런싱 실패 | Day 13 저녁 | Day 14 오전을 밸런싱에 더 할애 |
-| Day 14 빌드 깨짐 | Day 13 사전 빌드로 헤지 | PIE 녹화로 대체 |
+| 그리드 UI 드래그 버그 | Day 14 초반 | SlotSize/GrabOffset 수치 디버그 |
+| Day 14 밸런싱 실패 | Day 14 저녁 | Day 15 오전을 밸런싱에 더 할애 |
+| Day 15 빌드 깨짐 | Day 14 사전 빌드로 헤지 | PIE 녹화로 대체 |
 
 ---
 
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, Day 13 시작.
-Day 11(레벨 전환, ALRDoor, GameInstance 영속), Day 12(ULRHudWidget, 점 애니메이션, 완료/취소 텍스트) 완료.
+Last Refuge UE5.7 C++ 프로젝트, Day 14 시작.
+Day 13: 타르코프 스타일 그리드 인벤토리(ULRInventoryGridComponent, 10×5, 드래그앤드롭, 회전, Shift+클릭 이동),
+        보관함 분할 UI(WBP_Storage = 인벤 좌 + 창고 우), Actors/ 폴더 분리 완료.
+남은 미완성: IA_Inventory BP 할당, DataAsset ItemID/크기 설정, ItemRegistry 경로 확인.
 다음 작업: 밸런싱(AI 수치 조정) + 사운드(발자국/피격음) + Shipping 사전 빌드.
 엔진: UE 5.7.4, IDE: Rider, 접두사: LR
 ```
