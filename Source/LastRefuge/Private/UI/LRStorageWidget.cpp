@@ -13,15 +13,23 @@ void ULRStorageWidget::InitStorage(
 	if (!StorageContainer)     { UE_LOG(LogTemp, Error, TEXT("[Storage] StorageContainer null — WBP_Storage 디자이너에 'StorageContainer' Canvas Panel 필요")); return; }
 	if (!InStorageGrid)        { UE_LOG(LogTemp, Error, TEXT("[Storage] InStorageGrid null")); return; }
 
-	UE_LOG(LogTemp, Warning, TEXT("[Storage] InitStorage 시작 — ContainerGrid 아이템 수: %d"), InStorageGrid->GetItems().Num());
+	constexpr float SlotSizePx = 60.f;
 
-	// 그리드 위젯 크기 = GridWidth * SlotSize x GridHeight * SlotSize
-	// fill anchor를 쓰면 위젯이 컨테이너 전체를 채워 아이템(50px 단위)이 좌상단에만 몰림
-	constexpr float SlotSizePx = 50.f;
+	if (!InvGrid)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[Storage] InvGrid(플레이어 인벤토리) null — BP_LRCharacter에서 InventoryGrid 컴포넌트 확인 필요"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Storage] InvGrid OK — GridWidth=%d GridHeight=%d Items=%d"),
+			InvGrid->GridWidth, InvGrid->GridHeight, InvGrid->GetItems().Num());
+	}
+	UE_LOG(LogTemp, Warning, TEXT("[Storage] StorageGrid — GridWidth=%d GridHeight=%d"),
+		InStorageGrid->GridWidth, InStorageGrid->GridHeight);
 
 	// 좌측: 플레이어 인벤토리
 	PlayerInventoryWidget = CreateWidget<ULRInventoryGridWidget>(GetOwningPlayer(), GridWidgetClass);
-	if (PlayerInventoryWidget)
+	if (PlayerInventoryWidget && InvGrid)
 	{
 		PlayerInventoryWidget->InitGrid(InvGrid, InStorageGrid, SlotSizePx);
 

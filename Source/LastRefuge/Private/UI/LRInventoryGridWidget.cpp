@@ -1,6 +1,5 @@
 #include "UI/LRInventoryGridWidget.h"
 #include "UI/LRItemWidget.h"
-#include "UI/LRDragPreviewWidget.h"
 #include "UI/LRItemDragDropOperation.h"
 #include "Components/LRInventoryGridComponent.h"
 #include "Components/CanvasPanel.h"
@@ -8,16 +7,7 @@
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Rendering/DrawElements.h"
 #include "Components/Image.h"
-
-// ──────────────────────────────────────────────────────────
-// 내부 헬퍼: GridCanvas의 위젯 로컬 원점 계산
-// 풀스크린 위젯에서 GridCanvas가 중앙에 있을 때 오프셋을 자동 보정
-// ──────────────────────────────────────────────────────────
-FVector2D ULRInventoryGridWidget::GetGridCanvasOrigin(const FGeometry& InGeometry) const
-{
-	if (!GridCanvas) return FVector2D::ZeroVector;
-	return InGeometry.AbsoluteToLocal(GridCanvas->GetCachedGeometry().GetAbsolutePosition());
-}
+#include "UI/LRTooltipWidget.h"
 
 // ──────────────────────────────────────────────────────────
 // InitGrid
@@ -36,33 +26,27 @@ void ULRInventoryGridWidget::InitGrid(
 	GridChangedHandle = GridComponent->OnGridChanged.AddUObject(
 		this, &ULRInventoryGridWidget::RebuildGrid);
 
-	RebuildGrid();
-}
-
-void ULRInventoryGridWidget::NativeConstruct()
-{
-	Super::NativeConstruct();
-
-	if (PreviewWidgetClass && !PreviewWidget)
+	// 툴팁 위젯 생성 (뷰포트 최상단에 숨김 상태로 추가)
+	if (TooltipWidgetClass && !ActiveTooltip)
 	{
-		PreviewWidget = CreateWidget<ULRDragPreviewWidget>(this, PreviewWidgetClass);
-		if (PreviewWidget && GridCanvas)
+		ActiveTooltip = CreateWidget<ULRTooltipWidget>(GetOwningPlayer(), TooltipWidgetClass);
+		if (ActiveTooltip)
 		{
-			UCanvasPanelSlot* PreviewCanvasSlot = GridCanvas->AddChildToCanvas(PreviewWidget);
-			if (PreviewCanvasSlot)
-			{
-				PreviewCanvasSlot->SetSize(FVector2D(SlotSize, SlotSize));
-				PreviewCanvasSlot->SetZOrder(10);
-			}
-			PreviewWidget->SetVisibility(ESlateVisibility::Hidden);
+			ActiveTooltip->AddToViewport(50);
+			ActiveTooltip->SetVisibility(ESlateVisibility::Hidden);
 		}
 	}
+
+	RebuildGrid();
 }
 
 void ULRInventoryGridWidget::NativeDestruct()
 {
 	if (GridComponent)
 		GridComponent->OnGridChanged.Remove(GridChangedHandle);
+
+	if (ActiveTooltip)
+		ActiveTooltip->RemoveFromParent();
 
 	Super::NativeDestruct();
 }
@@ -84,9 +68,8 @@ int32 ULRInventoryGridWidget::NativePaint(
 	const int32 Cols = GridComponent->GridWidth;
 	const int32 Rows = GridComponent->GridHeight;
 
-	FVector2D Origin = FVector2D::ZeroVector;
-	if (GridCanvas)
-		Origin = AllottedGeometry.AbsoluteToLocal(GridCanvas->GetCachedGeometry().GetAbsolutePosition());
+	// GridCanvas가 Fill로 부모를 꽉 채우므로 오프셋은 항상 (0,0)
+	const FVector2D Origin = FVector2D::ZeroVector;
 
 	// ── 그리드 선 ────────────────────────────────────────
 	for (int32 Col = 0; Col <= Cols; ++Col)
@@ -113,7 +96,6 @@ int32 ULRInventoryGridWidget::NativePaint(
 			Origin.X + HoveredCell.X * SlotSize,
 			Origin.Y + HoveredCell.Y * SlotSize);
 
-		// 속이 찬 반투명 흰색 박스 (사각형 4변)
 		TArray<FVector2D> Box = {
 			TL,
 			FVector2D(TL.X + SlotSize, TL.Y),
@@ -124,6 +106,26 @@ int32 ULRInventoryGridWidget::NativePaint(
 		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2,
 			AllottedGeometry.ToPaintGeometry(), Box,
 			ESlateDrawEffect::None, FLinearColor(1.f, 1.f, 1.f, 0.35f), true, 2.f);
+	}
+
+	// ── 드래그 프리뷰 ────────────────────────────────────
+	if (bPreviewVisible && PreviewGridPos.X >= 0)
+	{
+		const FLinearColor PreviewColor = bPreviewCanPlace
+			? FLinearColor(0.f, 1.f, 0.f, 0.35f)
+			: FLinearColor(1.f, 0.f, 0.f, 0.35f);
+
+		const FVector2D TL(Origin.X + PreviewGridPos.X * SlotSize,
+		                   Origin.Y + PreviewGridPos.Y * SlotSize);
+		const FVector2D Sz(PreviewItemW * SlotSize, PreviewItemH * SlotSize);
+
+		FSlateColorBrush SolidBrush(FLinearColor::White);
+		FSlateDrawElement::MakeBox(
+			OutDrawElements, LayerId + 3,
+			AllottedGeometry.ToPaintGeometry(TL, Sz),
+			&SolidBrush,
+			ESlateDrawEffect::None,
+			PreviewColor);
 	}
 
 	return Result;
@@ -139,7 +141,7 @@ FReply ULRInventoryGridWidget::NativeOnMouseButtonDown(
 	if (!GridComponent) return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 
 	FVector2D LocalPx = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
-	LocalPx -= GetGridCanvasOrigin(InGeometry);
+	// GridCanvas가 Fill이므로 위젯 로컬 좌표 = 그리드 좌표
 
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 	{
@@ -170,8 +172,9 @@ FReply ULRInventoryGridWidget::NativeOnMouseButtonDown(
 			GrabOffsetSlots = (LocalPx - ItemOriginPx) / SlotSize;
 			PendingDragItemID = HitItemID;
 
-			UE_LOG(LogTemp, Warning, TEXT("[Grid] MouseButtonDown — ItemID: %d Cell: (%d,%d)"),
-				HitItemID, Cell.X, Cell.Y);
+			UE_LOG(LogTemp, Warning, TEXT("[Grab] ItemOrigin=(%d,%d) ItemSize=(%d×%d) ClickPx=(%.0f,%.0f) GrabOffset=(%.2f,%.2f)"),
+				Item.GridX, Item.GridY, Item.GetEffectiveWidth(), Item.GetEffectiveHeight(),
+				LocalPx.X, LocalPx.Y, GrabOffsetSlots.X, GrabOffsetSlots.Y);
 
 			return FReply::Handled().DetectDrag(TakeWidget(), EKeys::LeftMouseButton);
 		}
@@ -232,6 +235,10 @@ void ULRInventoryGridWidget::NativeOnDragDetected(
 
 	GridComponent->RemoveItem(PendingDragItemID);
 	PendingDragItemID = INDEX_NONE;
+	HidePreview();
+
+	if (ActiveTooltip)
+		ActiveTooltip->SetVisibility(ESlateVisibility::Hidden);
 
 	UE_LOG(LogTemp, Warning, TEXT("[Grid] DragDetected — %s"),
 		DraggedItemData.ItemData ? *DraggedItemData.ItemData->GetName() : TEXT("?"));
@@ -248,7 +255,7 @@ FReply ULRInventoryGridWidget::NativeOnMouseMove(
 	if (GridComponent)
 	{
 		FVector2D LocalPx = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
-		LocalPx -= GetGridCanvasOrigin(InGeometry);
+		// GridCanvas가 Fill이므로 위젯 로컬 좌표 = 그리드 좌표
 
 		const FIntPoint Cell(
 			FMath::FloorToInt(LocalPx.X / SlotSize),
@@ -263,6 +270,37 @@ FReply ULRInventoryGridWidget::NativeOnMouseMove(
 		{
 			HoveredCell = Next;
 			Invalidate(EInvalidateWidgetReason::Paint);
+
+			// 툴팁 갱신
+			if (ActiveTooltip)
+			{
+				if (HoveredCell.X >= 0)
+				{
+					const int32 HovItemID = GridComponent->GetItemIDAt(HoveredCell.X, HoveredCell.Y);
+					if (HovItemID != INDEX_NONE)
+					{
+						ActiveTooltip->SetItem(GridComponent->GetItems()[HovItemID]);
+						ActiveTooltip->SetVisibility(ESlateVisibility::HitTestInvisible);
+					}
+					else
+					{
+						ActiveTooltip->SetVisibility(ESlateVisibility::Hidden);
+					}
+				}
+				else
+				{
+					ActiveTooltip->SetVisibility(ESlateVisibility::Hidden);
+				}
+			}
+		}
+
+		// 툴팁 위치를 마우스 커서 옆으로 매 프레임 갱신
+		if (ActiveTooltip && ActiveTooltip->GetVisibility() != ESlateVisibility::Hidden)
+		{
+			FVector2D MouseViewportPos;
+			if (APlayerController* PC = GetOwningPlayer())
+				PC->GetMousePosition(MouseViewportPos.X, MouseViewportPos.Y);
+			ActiveTooltip->SetPositionInViewport(MouseViewportPos + FVector2D(16.f, 16.f), false);
 		}
 	}
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
@@ -275,6 +313,9 @@ void ULRInventoryGridWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEven
 		HoveredCell = FIntPoint(-1, -1);
 		Invalidate(EInvalidateWidgetReason::Paint);
 	}
+	if (ActiveTooltip)
+		ActiveTooltip->SetVisibility(ESlateVisibility::Hidden);
+
 	Super::NativeOnMouseLeave(InMouseEvent);
 }
 
@@ -292,7 +333,7 @@ void ULRInventoryGridWidget::RebuildGrid()
 	TArray<UWidget*> Children = GridCanvas->GetAllChildren();
 	for (UWidget* Child : Children)
 	{
-		if (Child && Child != PreviewWidget)
+		if (Child)
 			Child->RemoveFromParent();
 	}
 
@@ -329,14 +370,12 @@ bool ULRInventoryGridWidget::NativeOnDragOver(
 	if (!Op || !GridComponent) return false;
 
 	FVector2D LocalPx = InGeometry.AbsoluteToLocal(InDragDropEvent.GetScreenSpacePosition());
-	LocalPx -= GetGridCanvasOrigin(InGeometry);
+	// GridCanvas가 Fill이므로 위젯 로컬 좌표 = 그리드 좌표
 	LocalPx -= Op->GrabOffsetSlots * SlotSize;
 
 	const FIntPoint GridPos = GetGridIndexFromMouse(LocalPx);
 	const bool bCanPlace = GridComponent->CheckPlacement(
 		GridPos.X, GridPos.Y, Op->DraggedItem, Op->DraggedItem.bIsRotated);
-
-	UE_LOG(LogTemp, Verbose, TEXT("[Grid] DragOver (%d,%d) CanPlace=%d"), GridPos.X, GridPos.Y, bCanPlace);
 
 	ShowPreview(GridPos.X, GridPos.Y, Op->DraggedItem, bCanPlace);
 	return true;
@@ -355,7 +394,7 @@ bool ULRInventoryGridWidget::NativeOnDrop(
 	if (!Op || !GridComponent) return false;
 
 	FVector2D LocalPx = InGeometry.AbsoluteToLocal(InDragDropEvent.GetScreenSpacePosition());
-	LocalPx -= GetGridCanvasOrigin(InGeometry);
+	// GridCanvas가 Fill이므로 위젯 로컬 좌표 = 그리드 좌표
 	LocalPx -= Op->GrabOffsetSlots * SlotSize;
 
 	const FIntPoint GridPos = GetGridIndexFromMouse(LocalPx);
@@ -414,28 +453,24 @@ FVector2D ULRInventoryGridWidget::GridToLocal(int32 GridX, int32 GridY) const
 }
 
 // ──────────────────────────────────────────────────────────
-// 프리뷰 표시/숨김
+// 프리뷰 표시/숨김 (NativePaint에서 직접 렌더링)
 // ──────────────────────────────────────────────────────────
 void ULRInventoryGridWidget::ShowPreview(
 	int32 GridX, int32 GridY, const FLRGridItem& Item, bool bCanPlace)
 {
-	if (!PreviewWidget || !GridCanvas) return;
-
-	UCanvasPanelSlot* PreviewCanvasSlot = Cast<UCanvasPanelSlot>(PreviewWidget->Slot);
-	if (PreviewCanvasSlot)
-	{
-		PreviewCanvasSlot->SetPosition(GridToLocal(GridX, GridY));
-		PreviewCanvasSlot->SetSize(FVector2D(
-			Item.GetEffectiveWidth()  * SlotSize,
-			Item.GetEffectiveHeight() * SlotSize));
-	}
-
-	PreviewWidget->SetHighlight(bCanPlace);
-	PreviewWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	PreviewGridPos   = FIntPoint(GridX, GridY);
+	PreviewItemW     = Item.GetEffectiveWidth();
+	PreviewItemH     = Item.GetEffectiveHeight();
+	bPreviewVisible  = true;
+	bPreviewCanPlace = bCanPlace;
+	Invalidate(EInvalidateWidgetReason::Paint);
 }
 
 void ULRInventoryGridWidget::HidePreview()
 {
-	if (PreviewWidget)
-		PreviewWidget->SetVisibility(ESlateVisibility::Hidden);
+	if (bPreviewVisible)
+	{
+		bPreviewVisible = false;
+		Invalidate(EInvalidateWidgetReason::Paint);
+	}
 }

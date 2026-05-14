@@ -6,8 +6,8 @@
 #include "LRInventoryGridWidget.generated.h"
 
 class ULRInventoryGridComponent;
-class ULRDragPreviewWidget;
 class ULRItemWidget;
+class ULRTooltipWidget;
 class UCanvasPanel;
 
 /**
@@ -15,7 +15,6 @@ class UCanvasPanel;
  * Blueprint 서브클래스(WBP_InventoryGrid)에서 반드시 바인딩:
  *   - GridCanvas      (UCanvasPanel)
  *   - ItemWidgetClass (WBP_Item 서브클래스)
- *   - PreviewWidgetClass (WBP_DragPreview 서브클래스)
  *
  * 사용법:
  *   1. CreateWidget으로 생성
@@ -45,15 +44,14 @@ public:
 	TSubclassOf<ULRItemWidget> ItemWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "LR|Inventory")
-	TSubclassOf<ULRDragPreviewWidget> PreviewWidgetClass;
+	TSubclassOf<ULRTooltipWidget> TooltipWidgetClass;
 
 	// 그리드 선 색상
 	UPROPERTY(EditDefaultsOnly, Category = "LR|Inventory")
 	FLinearColor GridLineColor = FLinearColor(1.f, 1.f, 1.f, 0.15f);
 
 protected:
-	virtual void NativeConstruct() override;
-	virtual void NativeDestruct()  override;
+	virtual void NativeDestruct() override;
 
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry,
 	                           const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
@@ -98,7 +96,14 @@ private:
 	TObjectPtr<ULRInventoryGridComponent> StorageGrid;
 
 	UPROPERTY()
-	TObjectPtr<ULRDragPreviewWidget> PreviewWidget;
+	TObjectPtr<ULRTooltipWidget> ActiveTooltip;
+
+	// 드래그 프리뷰 상태 (NativePaint로 직접 렌더링)
+	FIntPoint PreviewGridPos  = FIntPoint(-1, -1);
+	int32     PreviewItemW    = 1;
+	int32     PreviewItemH    = 1;
+	bool      bPreviewVisible = false;
+	bool      bPreviewCanPlace = false;
 
 	float SlotSize = 50.f;
 
@@ -113,7 +118,6 @@ private:
 	FDelegateHandle GridChangedHandle;
 
 	// ── 좌표 변환 ───────────────────────────────────────
-	FVector2D GetGridCanvasOrigin(const FGeometry& InGeometry) const;
 	FIntPoint GetGridIndexFromMouse(FVector2D LocalPx) const;
 	FVector2D GridToLocal(int32 GridX, int32 GridY)   const;
 

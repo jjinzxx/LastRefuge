@@ -19,6 +19,7 @@
 #include "UI/LRInventoryGridWidget.h"
 #include "UI/LRStorageWidget.h"
 #include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
 #include "Items/LRItemDataAsset.h"
 #include "Interfaces/LRInteractable.h"
 
@@ -461,6 +462,11 @@ void ALRCharacter::OnHealthChanged(float NewHealth, float MaxHealth)
 
 void ALRCharacter::TryInteract()
 {
+    if (bStorageOpen)
+    {
+        CloseStorageScreen();
+        return;
+    }
     if (bIsSearching) return;
     if (Controller == nullptr) return;
 
@@ -551,12 +557,23 @@ void ALRCharacter::ToggleInventory()
                 UE_LOG(LogTemp, Error, TEXT("[Inventory] CreateWidget 실패"));
                 return;
             }
-            constexpr float SlotSizePx = 50.f;
+            constexpr float SlotSizePx = 60.f;
             InventoryWidget->InitGrid(InventoryGrid, nullptr, SlotSizePx);
             UE_LOG(LogTemp, Warning, TEXT("[Inventory] 위젯 생성 완료"));
         }
 
         InventoryWidget->AddToViewport(5);
+        {
+            const float W = InventoryGrid->GridWidth  * 60.f;
+            const float H = InventoryGrid->GridHeight * 60.f;
+            InventoryWidget->SetDesiredSizeInViewport(FVector2D(W, H));
+
+            const float DPI = UWidgetLayoutLibrary::GetViewportScale(GetWorld());
+            FVector2D ScreenSize;
+            GEngine->GameViewport->GetViewportSize(ScreenSize);
+            InventoryWidget->SetPositionInViewport(
+                (ScreenSize / DPI - FVector2D(W, H)) * 0.5f, false);
+        }
         PC->SetShowMouseCursor(true);
         {
             FInputModeGameAndUI Mode;

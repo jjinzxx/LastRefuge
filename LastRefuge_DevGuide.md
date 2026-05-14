@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 13 완료)
+# Last Refuge - 개발 인수인계 문서 (Day 14 진행 중)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -157,10 +157,10 @@ USTRUCT() FLRSavedItem {
 | Blueprint | 부모 클래스 | 추가 설정 |
 |---|---|---|
 | BP_LRCharacter | ALRCharacter | InventoryWidgetClass=WBP_InventoryGrid, StorageWidgetClass=WBP_Storage, IA_Inventory=IA_Inventory |
-| WBP_InventoryGrid | ULRInventoryGridWidget | ItemWidgetClass=WBP_LRItem, PreviewWidgetClass=WBP_DragPreview |
+| WBP_InventoryGrid | ULRInventoryGridWidget | ItemWidgetClass=WBP_LRItem (**PreviewWidgetClass 제거됨 — Day 14에서 NativePaint 방식으로 변경**) |
 | WBP_Storage | ULRStorageWidget | GridWidgetClass=WBP_InventoryGrid |
 | WBP_LRItem | ULRItemWidget | - |
-| WBP_DragPreview | ULRDragPreviewWidget | - |
+| WBP_DragPreview | ULRDragPreviewWidget | ⚠️ 더 이상 ULRInventoryGridWidget에서 사용하지 않음 |
 
 ### DataAsset 설정 (DA_Scrap / DA_Medkit / DA_Ration)
 - `ItemID`: 고유 문자열 (예: `"Scrap"`, `"Medkit"`, `"Ration"`)
@@ -194,7 +194,7 @@ USTRUCT() FLRSavedItem {
 | Day 11 | GetInteractionPrompt + 레벨 전환(ALRDoor) + GameInstance 인벤/보관함 영속 | ✅ 완료 |
 | Day 12 | Minimum Viable HUD (ULRHudWidget, 점 애니메이션, 완료/취소 텍스트) | ✅ 완료 |
 | Day 13 | **타르코프 스타일 그리드 인벤토리 + 보관함 분할 UI** | ✅ 완료 |
-| Day 14 | **밸런싱 (60%) + 사운드 (30%) + 사전 빌드 (10%)** | ⬜ 미완료 |
+| Day 14 | **그리드 UI 버그 수정 + 아이템 스태킹 + 좌/우클릭 분리** | 🔄 진행 중 |
 | Day 15 | **최종 빌드 + QA + 시연 영상** | ⬜ 미완료 |
 
 ---
@@ -218,7 +218,62 @@ USTRUCT() FLRSavedItem {
 
 ---
 
-## Day 14 — 밸런싱 + 사운드 + 사전 빌드
+## Day 14 — 그리드 UI 버그 수정 + 신규 기능
+
+### Day 14에서 수정한 것
+
+#### 드래그 프리뷰 좌표계 수정
+- **원인**: `ULRDragPreviewWidget`을 Canvas Panel 자식으로 추가하는 방식에서 Canvas Panel Slot의 앵커/정렬 기본값 문제로 시각적 위치가 틀렸음
+- **해결**: `NativePaint`에서 직접 `FSlateDrawElement::MakeBox`로 프리뷰 사각형 렌더링
+  - 그리드 선과 완전히 동일한 좌표계(`AllottedGeometry`) 사용
+  - 멤버 변수: `PreviewGridPos`, `PreviewItemW`, `PreviewItemH`, `bPreviewVisible`, `bPreviewCanPlace`
+  - `ShowPreview()` → 상태 업데이트 + `Invalidate(Paint)` 호출
+- **제거됨**: `NativeConstruct()`, `PreviewWidgetClass` UPROPERTY, `PreviewWidget` UPROPERTY
+
+#### 기타 수정
+- 툴팁 위치 고정 (`PC->GetMousePosition` 사용, `GetScreenSpacePosition` 오류 수정)
+- 그리드 슬롯 크기 50px → 60px
+- 스토리지 화면 중복 열기/닫기 버그 수정 (`bStorageOpen` 가드 추가)
+
+### 미해결 버그 — 드래그 프리뷰 위치 (그리드 엣지 아이템)
+
+**증상**: 아이템을 그리드 우측/하단 끝 (예: 9,4)에서 들면 프리뷰가 예상과 다른 위치에 표시됨. 중간 위치(예: 1,0)에서는 정상.
+
+**현재 진단 상태**:
+- `NativePaint` 방식으로 좌표계 문제는 해결됨
+- `GrabOffsetSlots` 계산 문제로 추정
+- `[Grab]` 진단 로그 추가됨: `NativeOnMouseButtonDown`에서 `ItemOrigin`, `ItemSize`, `GrabOffset` 출력
+- **다음 세션에서**: 엣지 위치(9,4)에서 드래그 후 `[Grab]` 로그 값 확인해서 원인 규명
+
+```cpp
+// LRInventoryGridWidget.cpp — MouseButtonDown의 진단 로그
+UE_LOG(LogTemp, Warning, TEXT("[Grab] ItemOrigin=(%d,%d) ItemSize=(%d×%d) ClickPx=(%.0f,%.0f) GrabOffset=(%.2f,%.2f)"), ...)
+```
+
+### 다음 세션에서 할 것 (우선순위 순)
+
+#### 1. 드래그 프리뷰 버그 마무리
+- `[Grab]` 로그로 `GrabOffset` 값 확인 후 수정
+- 수정 후 진단 로그 제거
+
+#### 2. 아이템 스태킹 (같은 종류 겹쳐 보관)
+- **목표**: 같은 `ItemData`를 가진 아이템은 `MaxStackSize`까지 같은 셀에 스택 가능
+- `FLRGridItem`에 `int32 Quantity = 1` 필드 추가
+- `LRInventoryGridComponent::PlaceItem`: 같은 셀에 같은 아이템 있으면 수량 합산 (MaxStackSize 초과 시 거부 또는 분할)
+- `ULRItemWidget`: 수량 > 1이면 숫자 텍스트 표시
+- 관련 클래스 수정: `FLRGridItem`, `ULRInventoryGridComponent`, `ULRItemWidget`
+
+#### 3. 좌클릭 / 우클릭 분리
+- **현재**: 우클릭 = UseItem (소비 아이템 사용)
+- **목표**:
+  - **좌클릭 드래그**: 전체 스택 들기 (기존 동작 유지)
+  - **우클릭 드래그**: 스택에서 1개만 들기 (`Quantity--` 후 Quantity=1인 새 GridItem 드래그)
+  - 우클릭 단순 클릭(드래그 없음) → UseItem 동작은 유지
+- `NativeOnMouseButtonDown`에서 `RightMouseButton` 처리 확장
+
+---
+
+## Day 15 — 밸런싱 + 사운드 + 사전 빌드
 
 ### 밸런싱 (60%)
 
@@ -257,10 +312,16 @@ Shipping 빌드 1회 패키징 → 실행 → 기본 루프 확인.
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, Day 14 시작.
+Last Refuge UE5.7 C++ 프로젝트, Day 14 이어서.
 Day 13: 타르코프 스타일 그리드 인벤토리(ULRInventoryGridComponent, 10×5, 드래그앤드롭, 회전, Shift+클릭 이동),
-        보관함 분할 UI(WBP_Storage = 인벤 좌 + 창고 우), Actors/ 폴더 분리 완료.
-남은 미완성: IA_Inventory BP 할당, DataAsset ItemID/크기 설정, ItemRegistry 경로 확인.
-다음 작업: 밸런싱(AI 수치 조정) + 사운드(발자국/피격음) + Shipping 사전 빌드.
+        보관함 분할 UI(WBP_Storage = 인벤 좌 + 창고 우).
+Day 14 진행 중:
+  - 드래그 프리뷰를 NativePaint 직접 렌더링 방식으로 교체 (Canvas Panel Slot 좌표계 버그 해결)
+  - 미해결: 아이템을 그리드 엣지(예: 9,4)에서 드래그하면 프리뷰 위치가 틀림
+    → [Grab] 진단 로그(NativeOnMouseButtonDown) 추가됨, 다음 세션에서 로그 확인 후 수정
+  - 다음 작업:
+    1. [Grab] 로그 확인 → 프리뷰 버그 수정
+    2. 아이템 스태킹 (FLRGridItem에 Quantity 추가, MaxStackSize 제한)
+    3. 좌클릭=전체 스택 드래그, 우클릭=1개만 드래그
 엔진: UE 5.7.4, IDE: Rider, 접두사: LR
 ```
