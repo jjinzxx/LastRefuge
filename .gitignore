@@ -9,8 +9,10 @@
 .claude/
 .LastRefuge_DevGuide.md
 
-# Content/ModularBuildingSet Folder
+# Content/
 .Content/ModularBuildingSet/
+.Content/DetectiveOffice/
+.Content/Construction/
 
 # User-specific stuff
 .idea/**/workspace.xml
