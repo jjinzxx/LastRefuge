@@ -306,12 +306,41 @@ void ALRCharacter::Tick(float DeltaTime)
     
     if (MovementState == ELRMovementState::Running)
     {
-        StatusComponent->ConsumeStamina(StatusComponent->GetStaminaDrainRate() * DeltaTime);
+        if (GetVelocity().Size2D() > 10.f)
+            StatusComponent->ConsumeStamina(StatusComponent->GetStaminaDrainRate() * DeltaTime);
 
         if (StatusComponent->IsStaminaEmpty())
-        {
             SetMovementState(ELRMovementState::Walking);
+    }
+
+    // 발자국 사운드
+    const float Speed2D = GetVelocity().Size2D();
+    if (Speed2D > 10.f)
+    {
+        float FootstepInterval = 0.5f;
+        USoundBase* FootstepSFX = SFX_Footstep_Walk;
+        if (MovementState == ELRMovementState::Running)
+        {
+            FootstepInterval = 0.3f;
+            FootstepSFX = SFX_Footstep_Run;
         }
+        else if (MovementState == ELRMovementState::Crouching)
+        {
+            FootstepInterval = 0.7f;
+            FootstepSFX = SFX_Footstep_Crouch;
+        }
+
+        FootstepTimer += DeltaTime;
+        if (FootstepTimer >= FootstepInterval)
+        {
+            FootstepTimer = 0.f;
+            if (FootstepSFX)
+                UGameplayStatics::PlaySoundAtLocation(this, FootstepSFX, GetActorLocation());
+        }
+    }
+    else
+    {
+        FootstepTimer = 0.f;
     }
 
     // 소음 보고
@@ -471,6 +500,8 @@ float ALRCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEve
     {
         CancelSearch();
         StatusComponent->ApplyDamage(Applied);
+        if (SFX_Hit)
+            UGameplayStatics::PlaySoundAtLocation(this, SFX_Hit, GetActorLocation());
     }
     return Applied;
 }
@@ -480,6 +511,9 @@ void ALRCharacter::OnHealthChanged(float NewHealth, float MaxHealth)
     if (NewHealth <= 0.f)
     {
         UE_LOG(LogTemp, Warning, TEXT("[Character] Health 0 — Game Over"));
+
+        if (SFX_Death)
+            UGameplayStatics::PlaySoundAtLocation(this, SFX_Death, GetActorLocation());
 
         if (ALRGameMode* GM = Cast<ALRGameMode>(GetWorld()->GetAuthGameMode()))
         {
@@ -741,6 +775,9 @@ void ALRCharacter::UseToolbarSlot(int32 SlotIndex)
         StatusComponent->RestoreHealth(Item.ItemData->HealthRestore);
         StatusComponent->RestoreStamina(Item.ItemData->StaminaRestore);
     }
+
+    if (SFX_ItemUse)
+        UGameplayStatics::PlaySoundAtLocation(this, SFX_ItemUse, GetActorLocation());
 
     Item.Quantity--;
     if (Item.Quantity <= 0)

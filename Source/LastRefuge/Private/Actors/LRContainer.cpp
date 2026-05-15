@@ -4,6 +4,7 @@
 #include "Components/LRInventoryGridComponent.h"
 #include "Items/LRItemDataAsset.h"
 #include "Items/LRInventoryStructs.h"
+#include "Kismet/GameplayStatics.h"
 
 ALRContainer::ALRContainer()
 {
@@ -64,6 +65,9 @@ void ALRContainer::BeginInteract(ALRCharacter* Player)
 {
 	if (bSearched) return;
 
+	if (SFX_SearchStart)
+		UGameplayStatics::PlaySoundAtLocation(this, SFX_SearchStart, GetActorLocation());
+
 	UE_LOG(LogTemp, Log, TEXT("컨테이너: 수색 시작"));
 }
 
@@ -74,6 +78,9 @@ void ALRContainer::EndInteract(ALRCharacter* Player)
 		UE_LOG(LogTemp, Warning, TEXT("컨테이너: 수색 취소"));
 		return;
 	}
+
+	if (SFX_SearchComplete)
+		UGameplayStatics::PlaySoundAtLocation(this, SFX_SearchComplete, GetActorLocation());
 
 	bSearched = true;
 	Player->OpenStorageScreen(ContainerGrid);

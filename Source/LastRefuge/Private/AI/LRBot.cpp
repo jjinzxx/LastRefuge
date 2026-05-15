@@ -6,6 +6,7 @@
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISense_Sight.h"
+#include "Kismet/GameplayStatics.h"
 
 ALRBot::ALRBot()
 {
@@ -96,9 +97,17 @@ void ALRBot::SetBotState(ELRBotState NewState)
 
 	float TargetSpeed = (NewState == ELRBotState::Combat) ? ChaseSpeed : PatrolSpeed;
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-	{
 		MoveComp->MaxWalkSpeed = TargetSpeed;
+
+	USoundBase* VoiceSFX = nullptr;
+	switch (NewState)
+	{
+	case ELRBotState::Combat:     VoiceSFX = SFX_Alert;          break;
+	case ELRBotState::Suspicious: VoiceSFX = SFX_Suspicious;     break;
+	case ELRBotState::Patrol:     VoiceSFX = SFX_ReturnToPatrol; break;
 	}
+	if (VoiceSFX)
+		UGameplayStatics::PlaySoundAtLocation(this, VoiceSFX, GetActorLocation());
 
 	UE_LOG(LogTemp, Warning, TEXT("[LRBot] State → %s"),
 		*UEnum::GetValueAsString(NewState));

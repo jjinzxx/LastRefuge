@@ -144,6 +144,25 @@ public:
     UPROPERTY(EditAnywhere, Category = "Input")
     TObjectPtr<UInputAction> IA_Menu;
 
+    // === Sound ===
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    TObjectPtr<USoundBase> SFX_Footstep_Walk;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    TObjectPtr<USoundBase> SFX_Footstep_Run;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    TObjectPtr<USoundBase> SFX_Footstep_Crouch;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    TObjectPtr<USoundBase> SFX_ItemUse;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    TObjectPtr<USoundBase> SFX_Hit;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    TObjectPtr<USoundBase> SFX_Death;
+
     // === UI 델리게이트 ===
     UPROPERTY(BlueprintAssignable, Category = "LR|UI")
     FOnSearchProgressChanged OnSearchProgressChanged;
@@ -221,6 +240,8 @@ protected:
 
     float TargetCameraHeight = 60.f;
     float TargetCapsuleHalfHeight = 96.f;
+
+    float FootstepTimer = 0.f;
 
     virtual void Tick(float DeltaTime) override;
 

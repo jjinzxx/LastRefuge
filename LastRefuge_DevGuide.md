@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 15 진행 중)
+# Last Refuge - 개발 인수인계 문서 (Day 16 진행 중)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -197,7 +197,7 @@ USTRUCT() FLRSavedItem {
 | Day 12 | Minimum Viable HUD (ULRHudWidget, 점 애니메이션, 완료/취소 텍스트) | ✅ 완료 |
 | Day 13 | **타르코프 스타일 그리드 인벤토리 + 보관함 분할 UI** | ✅ 완료 |
 | Day 14 | **그리드 UI 버그 수정 + 아이템 스태킹 + 좌/우클릭 분리 + 컨텍스트 메뉴** | ✅ 완료 |
-| Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | 🔄 진행 중 (툴바·ESC·메인화면 완료) |
+| Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | ✅ 완료 (1인칭 손·다리 제외 — 풀바디로 멀티 시 구현 예정) |
 
 ---
 
@@ -288,45 +288,93 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 
 ## Day 15 — 비주얼 · UI · 오디오 완성
 
-### 1. 1인칭 손 · 다리 구현
-- 캐릭터 1인칭 뷰에서 손과 다리가 화면에 보이도록 메시/애니메이션 추가
-- 아이템을 들었을 때 손에 들고 있는 모습 포함 (툴바 아이템 장착 시 연동)
-- 관련 클래스: `ALRCharacter` + 1인칭 Arms/Legs SkeletalMesh 추가
+### ✅ 완료 — 툴바 (단축키 슬롯 1~4)
 
-### 2. 툴바 (단축키 슬롯 1~4)
-- 화면 하단 HUD에 4개 슬롯 표시
-- 인벤토리에서 아이템을 슬롯에 드래그하거나 지정 가능
-- 슬롯 유형별 동작:
-  - **장비류 (무기, 도구)** → 1인칭 손에 장착 (들고 다니기)
-  - **소비·회복 아이템** → 키 누르면 즉시 UseItem
-  - **키카드류** → 손에 들고, 문 상호작용 시 자동 소모
-- 키 바인딩: `1` `2` `3` `4`
-- 관련 클래스: `ULRHudWidget` (슬롯 UI), `ALRCharacter` (ActiveSlot 상태 관리)
+툴바는 인벤토리와 **별도의 물리적 보관 공간**으로 구현. 아이템이 실제로 인벤에서 빠져 나와 툴바 슬롯에 저장됨.
 
-### 3. 적 모션 · 공격 애니메이션
-- `ALRBot` 순찰/의심/추격 상태별 Locomotion 애니메이션 연결
-- 근접 공격 또는 사격 공격 모션 추가
-- ABP_LRBot (AnimBlueprint) 작성: Idle / Walk / Run / Attack 스테이트
+**ALRCharacter 변경:**
+- `TArray<FLRGridItem> ToolbarItems` (크기 4, 빈 슬롯 = `IsEmpty() == true`)
+- `SetToolbarSlot(SlotIndex, FLRGridItem)`: 슬롯에 아이템 저장 + `OnToolbarSlotChanged` 브로드캐스트
+- `ClearToolbarSlot(SlotIndex)`: 아이템을 인벤토리로 반환 후 슬롯 비움 (우클릭)
+- `TakeToolbarItem(SlotIndex)`: 드래그 시작 시 슬롯에서 꺼내기 (인벤 반환 없음)
+- `UseToolbarSlot(SlotIndex)`: Consumable이면 StatusComponent로 효과 적용, Quantity 감소
+- `TogglePauseMenu()`: 인벤/보관함 열려있으면 먼저 닫음
+- BeginPlay: `GI->PersistentToolbarItems`로 툴바 복원, `SetInputMode(FInputModeGameOnly())` 리셋
+- Look(): `GI->MouseSensitivity` 곱셈 적용
+- `IA_Toolbar1~4`, `IA_Menu` 바인딩 추가
 
-### 4. 메인 화면 (엔트리 UI)
-- 게임 시작 시 가장 먼저 보이는 화면
-- 버튼 구성: **[게임 시작]** / **[설정]** / **[종료]**
-- 설정: 마우스 감도, 볼륨 슬라이더 등 기본 옵션
-- 관련 클래스: `ULRMainMenuWidget` (신규), 전용 맵 `L_MainMenu` 또는 레벨 블루프린트
+**ULRToolbarSlotWidget (신규):**
+- `InitSlot(ALRCharacter*, SlotIndex)` / `RefreshSlot(ULRItemDataAsset*, Quantity)`
+- BindWidget: `IconImage` / BindWidgetOptional: `QuantityText`, `SlotNumberText`
+- 우클릭 → `ClearToolbarSlot` (인벤 반환)
+- 좌클릭 드래그 → `TakeToolbarItem` → `ULRItemDragDropOperation` 생성
+- Drop: 슬롯 점유 시 기존 아이템을 소스 그리드로 스왑 → `SetToolbarSlot`
 
-### 5. ESC 인게임 메뉴
-- 플레이 중 ESC 누르면 팝업 메뉴
-- 항목: **[계속하기]** / **[설정]** / **[메인으로]** / **[종료]**
-- `IA_Menu` (ESC 키) → `ALRCharacter::TogglePauseMenu()`
-- 관련 클래스: `ULRPauseMenuWidget` (신규)
+**ULRHudWidget 변경:**
+- BindWidgetOptional: `ToolbarSlot1~4`
+- `OnToolbarSlotChanged(SlotIndex, ItemData, Quantity)` 핸들러
+- `RefreshAllToolbarSlots()`: `GetToolbarItems()` 직접 참조 (그리드 미사용)
+- `InitSlot` 4개 호출 후 `RefreshAllToolbarSlots()` (초기 상태 반영)
 
-### 6. 사운드 연결
-- 발자국 3종 (Walk / Run / Crouch)
-- AI 감지 보이스 (발견 / 의심 / 복귀)
-- 피격음 / 사망음
-- 아이템 사용음 (회복, 수색 완료)
-- 수색 루프음 · 앰비언트 BGM (권장)
-- 관련 클래스: `UAudioComponent` 또는 `UGameplayStatics::PlaySoundAtLocation`
+**ULRGameInstance 변경:**
+- `TArray<FLRGridItem> PersistentToolbarItems` 추가
+- `float MouseSensitivity = 1.0f`, `float MasterVolume = 1.0f` 추가
+
+**에디터 설정:**
+- `IA_Toolbar1~4`, `IA_Menu` InputAction 에셋 생성 후 BP_LRCharacter에 할당
+- WBP_Hud에 `ToolbarSlot1~4` 슬롯 위젯 배치 (변수명 정확히 일치)
+- WBP_ToolbarSlot: `IconImage`(Image 위젯), `QuantityText`(TextBlock, Optional), `SlotNumberText`(TextBlock, Optional)
+- L_MainMenu World Settings → GameMode Override → **Game Mode Base** (Default Pawn = None) 설정 필요
+
+---
+
+### ✅ 완료 — ESC 인게임 일시정지 메뉴
+
+**ULRPauseMenuWidget (신규):**
+- BindWidget: `Btn_Resume`, `Btn_MainMenu`, `Btn_Quit`
+- Resume → `Char->TogglePauseMenu()`
+- MainMenu → `UGameplayStatics::OpenLevel(this, "L_MainMenu")`
+- Quit → `UKismetSystemLibrary::QuitGame`
+
+**ALRCharacter::TogglePauseMenu():**
+- 인벤/보관함 열려있으면 먼저 닫고 종료
+- 메뉴 열기: `SetGamePaused(true)`, `SetShowMouseCursor(true)`, `SetInputMode(GameAndUI)`, 위젯 AddToViewport
+- 메뉴 닫기: `SetGamePaused(false)`, `SetShowMouseCursor(false)`, `SetInputMode(GameOnly)`, 위젯 RemoveFromParent
+
+**에디터 설정:**
+- `PauseMenuWidgetClass` = WBP_PauseMenu (BP_LRCharacter에서 할당)
+- ESC 키 → IA_Menu에 바인딩 (현재 임시로 `5`키 사용 중, 추후 ESC로 변경)
+
+---
+
+### ✅ 완료 — 메인 화면
+
+**ULRMainMenuWidget (신규):**
+- BindWidget: `Btn_Start`, `Btn_Settings`, `Btn_Quit`, `Panel_Settings`, `SL_Sensitivity`, `SL_Volume`
+- `StartLevelName = "L_Base"` (EditAnywhere)
+- Settings 버튼 → `Panel_Settings` 토글 (Collapsed ↔ Visible)
+- 슬라이더 변경 → `GI->MouseSensitivity` / `GI->MasterVolume` 저장
+- 볼륨 변경 → `FAudioDevice::SetTransientPrimaryVolume(Value)` 즉시 반영
+- NativeConstruct에서 GI 저장값으로 슬라이더 초기값 설정
+
+**레벨 설정:**
+- `L_MainMenu` 전용 맵. World Settings GameMode Override = **Game Mode Base** (Default Pawn = None)
+- Level Blueprint BeginPlay → Get Player Controller → Show Mouse Cursor = true, SetInputMode UIOnly
+
+---
+
+### ⬜ 미완료 — 사운드 연결
+- 발자국 3종 (Walk / Run / Crouch), AI 감지 보이스, 피격음/사망음
+- 아이템 사용음, 수색 루프음, 앰비언트 BGM
+- `UAudioComponent` 또는 `UGameplayStatics::PlaySoundAtLocation`
+
+### ⬜ 미완료 — 적 애니메이션
+- `ALRBot` 순찰/의심/추격 Locomotion 애니메이션 연결
+- ABP_LRBot: Idle / Walk / Run / Attack 스테이트
+
+### ⬜ 미완료 — 1인칭 손·다리
+- 1인칭 뷰 Arms/Legs SkeletalMesh 추가
+- 툴바 아이템 장착 시 손 연동
 
 ---
 
@@ -346,6 +394,16 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 
 ---
 
+## 향후 추가 기능 (Post Day 16)
+
+| 기능 | 설명 |
+|---|---|
+| AI 근접 공격 | 현재 원거리 사격 → 근접 공격으로 변경. `ALRBot` 공격 범위 내 진입 시 `TakeDamage` 직접 호출 |
+| 제압 시스템 | AI 뒤에서 `F`키 → 즉시 제압 (처치 또는 기절). `IA_Takedown` 바인딩, 각도 조건 검사 필요 |
+| 플레이어 공격 | 근접/원거리 공격 기능. `IA_Attack` 바인딩, 히트박스 또는 LineTrace 기반 데미지 |
+
+---
+
 ## 일정 리스크 매트릭스
 
 | 리스크 | 대응 시점 | 대응 |
@@ -359,16 +417,22 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, Day 14 이어서.
+Last Refuge UE5.7 C++ 프로젝트, Day 15 이어서.
 Day 13: 타르코프 스타일 그리드 인벤토리(ULRInventoryGridComponent, 10×5, 드래그앤드롭, 회전, Shift+클릭 이동),
         보관함 분할 UI(WBP_Storage = 인벤 좌 + 창고 우).
-Day 14 진행 중:
-  - 드래그 프리뷰를 NativePaint 직접 렌더링 방식으로 교체 (Canvas Panel Slot 좌표계 버그 해결)
-  - 미해결: 아이템을 그리드 엣지(예: 9,4)에서 드래그하면 프리뷰 위치가 틀림
-    → [Grab] 진단 로그(NativeOnMouseButtonDown) 추가됨, 다음 세션에서 로그 확인 후 수정
-  - 다음 작업:
-    1. [Grab] 로그 확인 → 프리뷰 버그 수정
-    2. 아이템 스태킹 (FLRGridItem에 Quantity 추가, MaxStackSize 제한)
-    3. 좌클릭=전체 스택 드래그, 우클릭=1개만 드래그
+Day 14: 드래그 프리뷰 NativePaint 방식 교체, 아이템 스태킹(Quantity), 우클릭 1개 드래그,
+        컨텍스트 메뉴(ULRContextMenuWidget, 사용하기/정보), 인벤 이미지 오정렬 버그 수정.
+Day 15 진행 중:
+  ✅ 완료:
+    - 툴바 별도 물리 공간 (TArray<FLRGridItem> ToolbarItems, ULRToolbarSlotWidget)
+      · 인벤에서 드래그→슬롯 배치, 우클릭=인벤 반환, 1~4키=즉시 사용
+      · GameInstance PersistentToolbarItems + LRSaveGame 직렬화 포함
+    - ESC 일시정지 메뉴 (ULRPauseMenuWidget: 계속하기/메인으로/종료)
+    - 메인 화면 (ULRMainMenuWidget: 시작/설정/종료, 감도·볼륨 슬라이더)
+      · L_MainMenu 전용 맵, GameMode Base (Pawn 없음)
+  ⬜ 남은 작업:
+    1. 사운드 연결 (발자국, AI 보이스, 피격음, 아이템 사용음)
+    2. 적 애니메이션 (ABP_LRBot: Idle/Walk/Run/Attack)
+    3. 1인칭 손·다리 메시
 엔진: UE 5.7.4, IDE: Rider, 접두사: LR
 ```

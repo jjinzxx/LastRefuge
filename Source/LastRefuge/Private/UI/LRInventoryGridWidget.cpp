@@ -333,7 +333,8 @@ FReply ULRInventoryGridWidget::NativeOnMouseMove(
 			FVector2D MouseViewportPos;
 			if (APlayerController* PC = GetOwningPlayer())
 				PC->GetMousePosition(MouseViewportPos.X, MouseViewportPos.Y);
-			ActiveTooltip->SetPositionInViewport(MouseViewportPos + FVector2D(16.f, 16.f), false);
+			const float DPI = UWidgetLayoutLibrary::GetViewportScale(GetWorld());
+			ActiveTooltip->SetPositionInViewport((MouseViewportPos + FVector2D(16.f, 16.f)) / DPI, false);
 		}
 	}
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);

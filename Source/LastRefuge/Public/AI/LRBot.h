@@ -55,11 +55,11 @@ public:
 	
 	// bot 순찰 걷기 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LR|AI|Movement")
-	float PatrolSpeed = 200.f;
+	float PatrolSpeed = 180.f;
 
 	// bot 순찰 뛰기 속도
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LR|AI|Movement")
-	float ChaseSpeed = 280.f;
+	float ChaseSpeed = 250.f;
 	
 	virtual void Tick(float DeltaTime) override;
 	
@@ -81,6 +81,16 @@ public:
 	// 상태 전환
 	void SetBotState(ELRBotState NewState);
 	ELRBotState GetBotState() const { return CurrentState; }
+
+	// AI 감지 보이스
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> SFX_Alert;
+
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> SFX_Suspicious;
+
+	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> SFX_ReturnToPatrol;
 
 protected:
 	virtual void BeginPlay() override;
