@@ -368,13 +368,26 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 - 아이템 사용음, 수색 루프음, 앰비언트 BGM
 - `UAudioComponent` 또는 `UGameplayStatics::PlaySoundAtLocation`
 
-### ⬜ 미완료 — 적 애니메이션
-- `ALRBot` 순찰/의심/추격 Locomotion 애니메이션 연결
-- ABP_LRBot: Idle / Walk / Run / Attack 스테이트
+### ✅ 완료 — 적 애니메이션
+- `ULRBotAnimInstance` (Speed, BotState 변수) + `ABP_LRBot` (Blend Space 1D: Idle~Walk)
+- `AM_Bot_MeleeAttack` AnimMontage — DefaultSlot 통해 재생
+- Mixamo 애니메이션 → IK Retargeter(RTG_Manny_to_Quantum)로 QuantumCharacter 스켈레톤에 리타게팅
+- **알려진 문제**: QuantumCharacter 손가락 서브본(`_half`, `_in`, `_dip` 등) 미매핑 → 손가락 모양 부자연스러움
+
+### ✅ 완료 — AI 근접 공격
+- 원거리 사격(LineTrace) → 근접 공격(거리 체크 `MeleeRange=150`) 방식으로 교체
+- `TryMeleeAttack()`: 범위 내 진입 시 `MeleeDamage` 적용 + `MeleeAttackMontage` 재생
+- `MeleeDamage=25`, `MeleeInterval=1.5f`, `MeleeRange=150f` (BP_LRBot에서 조정 가능)
+
+### ✅ 완료 — 제압 시스템
+- `IA_Takedown` (F키) → `ALRCharacter::TryTakedown()`
+- 조건: 봇 뒤 방향 ±60도, 거리 150 이내
+- 성공: `ALRBot::TakedownKill()` → DeathMontage 재생 + AI 비활성화 + 3초 후 제거
+- `bIsDead` 플래그로 중복 제압 방지
+- Tick에서 조건 충족 시 `[F] 제압하기` 프롬프트 표시
 
 ### ⬜ 미완료 — 1인칭 손·다리
-- 1인칭 뷰 Arms/Legs SkeletalMesh 추가
-- 툴바 아이템 장착 시 손 연동
+- 풀바디 캐릭터 방식으로 멀티플레이 구현 시 함께 처리 예정
 
 ---
 
@@ -394,13 +407,16 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 
 ---
 
-## 향후 추가 기능 (Post Day 16)
+## 향후 추가 기능
 
-| 기능 | 설명 |
-|---|---|
-| AI 근접 공격 | 현재 원거리 사격 → 근접 공격으로 변경. `ALRBot` 공격 범위 내 진입 시 `TakeDamage` 직접 호출 |
-| 제압 시스템 | AI 뒤에서 `F`키 → 즉시 제압 (처치 또는 기절). `IA_Takedown` 바인딩, 각도 조건 검사 필요 |
-| 플레이어 공격 | 근접/원거리 공격 기능. `IA_Attack` 바인딩, 히트박스 또는 LineTrace 기반 데미지 |
+| 기능 | 상태 | 설명 |
+|---|---|---|
+| AI 근접 공격 | ✅ 완료 | 거리 기반 데미지 + MeleeAttackMontage |
+| 제압 시스템 | ✅ 완료 | F키, 뒤 방향 ±60도, DeathMontage |
+| 플레이어 공격 | ⬜ 예정 | `IA_Attack` 바인딩, LineTrace 기반 데미지 |
+| 사운드 에셋 연결 | ⬜ 예정 | 발자국·피격·AI 보이스 에셋 준비 후 BP에서 할당 |
+| 1인칭 손·다리 | ⬜ 예정 | 멀티플레이 구현 시 풀바디 방식으로 함께 처리 |
+| 손가락 리타게팅 개선 | ⬜ 알려진 문제 | QuantumCharacter 서브본 미매핑 → 손가락 부자연스러움 |
 
 ---
 

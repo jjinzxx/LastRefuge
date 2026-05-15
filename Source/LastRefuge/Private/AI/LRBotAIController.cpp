@@ -5,7 +5,6 @@
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISense_Hearing.h"
 #include "Kismet/GameplayStatics.h"
-#include "DrawDebugHelpers.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
 
@@ -43,7 +42,7 @@ void ALRBotAIController::OnPossess(APawn* InPawn)
 
 void ALRBotAIController::OnUnPossess()
 {
-    StopFiring();
+    StopMelee();
 
     if (GetWorld())
         GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
@@ -106,7 +105,7 @@ void ALRBotAIController::EnterCombat(AActor* PlayerActor)
         BB->SetValueAsInt(BB_BotState, 2);
     }
 
-    StartFiring();
+    StartMelee();
 
     // 0.1초마다 플레이어 위치를 BB PatrolTarget에 갱신
     GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
@@ -120,7 +119,7 @@ void ALRBotAIController::EnterCombat(AActor* PlayerActor)
 void ALRBotAIController::EnterSuspicious(const FVector& InLKL)
 {
     UE_LOG(LogTemp, Warning, TEXT("[LRBot] → SUSPICIOUS"));
-    StopFiring();
+    StopMelee();
 
     GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
 
@@ -166,7 +165,7 @@ void ALRBotAIController::AbortToPatrol()
 {
     UE_LOG(LogTemp, Warning, TEXT("[LRBot] AbortToPatrol (player died)"));
 
-    StopFiring();
+    StopMelee();
 
     if (GetWorld())
         GetWorld()->GetTimerManager().ClearTimer(CombatTrackingHandle);
@@ -193,47 +192,34 @@ void ALRBotAIController::UpdateCombatTarget()
     }
 }
 
-// ── 사격 ────────────────────────────────────────────────
-void ALRBotAIController::StartFiring()
+// ── 근접 공격 ─────────────────────────────────────────────
+void ALRBotAIController::StartMelee()
 {
-    if (GetWorld()->GetTimerManager().IsTimerActive(FireTimerHandle)) return;
+    if (GetWorld()->GetTimerManager().IsTimerActive(MeleeTimerHandle)) return;
     GetWorld()->GetTimerManager().SetTimer(
-        FireTimerHandle, this, &ALRBotAIController::FireAtPlayer,
-        ControlledBot->FireInterval, true, 0.5f);
+        MeleeTimerHandle, this, &ALRBotAIController::TryMeleeAttack,
+        ControlledBot->MeleeInterval, true, 0.5f);
 }
 
-void ALRBotAIController::StopFiring()
+void ALRBotAIController::StopMelee()
 {
     if (GetWorld())
-        GetWorld()->GetTimerManager().ClearTimer(FireTimerHandle);
+        GetWorld()->GetTimerManager().ClearTimer(MeleeTimerHandle);
 }
 
-void ALRBotAIController::FireAtPlayer()
+void ALRBotAIController::TryMeleeAttack()
 {
-    if (!ControlledBot || !TrackedPlayer) { StopFiring(); return; }
+    if (!ControlledBot || !TrackedPlayer) { StopMelee(); return; }
 
-    FVector Start = ControlledBot->GetActorLocation() + FVector(0, 0, 60.f);
-    FVector End   = TrackedPlayer->GetActorLocation();
+    const float Dist = FVector::Dist(ControlledBot->GetActorLocation(), TrackedPlayer->GetActorLocation());
+    if (Dist > ControlledBot->MeleeRange) return;
 
-    FHitResult Hit;
-    FCollisionQueryParams Params;
-    Params.AddIgnoredActor(ControlledBot);
+    if (ControlledBot->MeleeAttackMontage)
+        ControlledBot->GetMesh()->GetAnimInstance()->Montage_Play(ControlledBot->MeleeAttackMontage);
 
-    // TODO: 근접 전투 시스템 도입 시 봇 위협 수단 재설계
-    bool bHit = GetWorld()->LineTraceSingleByChannel(
-        Hit, Start, End, ECC_Pawn, Params);
-    
-#if WITH_EDITOR
-    DrawDebugLine(GetWorld(), Start, bHit ? Hit.Location : End,
-        bHit ? FColor::Red : FColor::Yellow, false, 0.8f, 0, 1.5f);
-#endif
+    UGameplayStatics::ApplyDamage(
+        TrackedPlayer, ControlledBot->MeleeDamage,
+        this, ControlledBot, nullptr);
 
-    if (bHit && Hit.GetActor() == TrackedPlayer)
-    {
-        UGameplayStatics::ApplyDamage(
-            TrackedPlayer, ControlledBot->FireDamage,
-            this, ControlledBot, nullptr);
-
-        UE_LOG(LogTemp, Warning, TEXT("[LRBot] Hit! %.0f dmg"), ControlledBot->FireDamage);
-    }
+    UE_LOG(LogTemp, Warning, TEXT("[LRBot] Melee Hit! %.0f dmg (dist: %.0f)"), ControlledBot->MeleeDamage, Dist);
 }

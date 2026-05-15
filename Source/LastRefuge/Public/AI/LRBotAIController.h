@@ -29,9 +29,9 @@ private:
 	void EnterCombat(AActor* PlayerActor);
 	void EnterSuspicious(const FVector& InLKL);
 
-	void StartFiring();
-	void StopFiring();
-	void FireAtPlayer();
+	void StartMelee();
+	void StopMelee();
+	void TryMeleeAttack();
 
 	// Combat 중 실시간 위치 추적 타이머
 	void UpdateCombatTarget();
@@ -42,8 +42,8 @@ private:
 	UPROPERTY()
 	AActor* TrackedPlayer = nullptr;
 
-	FTimerHandle FireTimerHandle;
-	FTimerHandle CombatTrackingHandle;  // ← 추가
+	FTimerHandle MeleeTimerHandle;
+	FTimerHandle CombatTrackingHandle;
 
 	static const FName BB_PatrolTarget;
 	static const FName BB_PatrolIndex;

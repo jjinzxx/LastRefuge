@@ -119,26 +119,44 @@
   "hotPaths": [
     {
       "path": "Source\\LastRefuge\\Private\\Character\\LRCharacter.cpp",
-      "accessCount": 21,
-      "lastAccessed": 1778829372866,
+      "accessCount": 26,
+      "lastAccessed": 1778838365525,
       "type": "file"
     },
     {
       "path": "LastRefuge_DevGuide.md",
-      "accessCount": 15,
-      "lastAccessed": 1778829917200,
+      "accessCount": 18,
+      "lastAccessed": 1778838774763,
       "type": "file"
     },
     {
       "path": "Source\\LastRefuge\\Public\\Character\\LRCharacter.h",
-      "accessCount": 14,
-      "lastAccessed": 1778821493185,
+      "accessCount": 16,
+      "lastAccessed": 1778838110046,
       "type": "file"
     },
     {
       "path": "Source\\LastRefuge\\Private\\UI\\LRHudWidget.cpp",
       "accessCount": 9,
       "lastAccessed": 1778811489672,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Private\\AI\\LRBotAIController.cpp",
+      "accessCount": 8,
+      "lastAccessed": 1778838534138,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Private\\AI\\LRBot.cpp",
+      "accessCount": 7,
+      "lastAccessed": 1778838529247,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\AI\\LRBot.h",
+      "accessCount": 6,
+      "lastAccessed": 1778838343333,
       "type": "file"
     },
     {
@@ -169,12 +187,6 @@
       "path": "Source\\LastRefuge\\Private\\Actors\\LRContainer.cpp",
       "accessCount": 3,
       "lastAccessed": 1778821535689,
-      "type": "file"
-    },
-    {
-      "path": "Source\\LastRefuge\\Private\\AI\\LRBot.cpp",
-      "accessCount": 3,
-      "lastAccessed": 1778821552149,
       "type": "file"
     },
     {
@@ -220,15 +232,15 @@
       "type": "file"
     },
     {
-      "path": "Source\\LastRefuge\\Public\\AI\\LRBot.h",
-      "accessCount": 2,
-      "lastAccessed": 1778821540999,
-      "type": "file"
-    },
-    {
       "path": "Source\\LastRefuge\\Private\\UI\\LRInventoryGridWidget.cpp",
       "accessCount": 2,
       "lastAccessed": 1778828882256,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\AI\\LRBotAIController.h",
+      "accessCount": 2,
+      "lastAccessed": 1778832415059,
       "type": "file"
     },
     {

@@ -71,12 +71,28 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|State")
 	FVector LastKnownLocation = FVector::ZeroVector;
 
-	// 사격 수치
+	// 근접 공격 수치
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
-	float FireDamage = 25.f;
+	float MeleeDamage = 25.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
-	float FireInterval = 1.5f;
+	float MeleeInterval = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
+	float MeleeRange = 150.f;
+
+	// 근접 공격 애니메이션 몽타주
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
+	TObjectPtr<UAnimMontage> MeleeAttackMontage;
+
+	// 사망 애니메이션 몽타주
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
+	TObjectPtr<UAnimMontage> DeathMontage;
+
+	// 제압당해 사망 처리
+	void TakedownKill();
+
+	bool bIsDead = false;
 
 	// 상태 전환
 	void SetBotState(ELRBotState NewState);

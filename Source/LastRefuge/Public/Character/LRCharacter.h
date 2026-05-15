@@ -144,6 +144,10 @@ public:
     UPROPERTY(EditAnywhere, Category = "Input")
     TObjectPtr<UInputAction> IA_Menu;
 
+    // 제압 키 InputAction (에디터에서 할당)
+    UPROPERTY(EditAnywhere, Category = "Input")
+    TObjectPtr<UInputAction> IA_Takedown;
+
     // === Sound ===
     UPROPERTY(EditDefaultsOnly, Category = "Sound")
     TObjectPtr<USoundBase> SFX_Footstep_Walk;
@@ -271,6 +275,7 @@ protected:
     void ReportMovementNoise();
     void TryInteract();
     void CancelSearch();
+    void TryTakedown();
 
     // --- 수색 게이지 상태 ---
     bool bIsSearching = false;

@@ -24,6 +24,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Items/LRItemDataAsset.h"
 #include "Interfaces/LRInteractable.h"
+#include "AI/LRBot.h"
 
 ALRCharacter::ALRCharacter()
 {
@@ -160,6 +161,9 @@ void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 
         if (IA_Menu)
             EIC->BindAction(IA_Menu, ETriggerEvent::Started, this, &ALRCharacter::TogglePauseMenu);
+
+        if (IA_Takedown)
+            EIC->BindAction(IA_Takedown, ETriggerEvent::Started, this, &ALRCharacter::TryTakedown);
     }
 }
 
@@ -412,6 +416,39 @@ void ALRCharacter::Tick(float DeltaTime)
         }
     }
 
+    // --- 제압 프롬프트 ---
+    if (!bStorageOpen && !bInventoryOpen)
+    {
+        const float TakedownRange = 150.f;
+        const float TakedownAngle = 60.f;
+        bool bCanTakedown = false;
+
+        TArray<AActor*> NearBots;
+        UGameplayStatics::GetAllActorsOfClass(GetWorld(), ALRBot::StaticClass(), NearBots);
+        for (AActor* Actor : NearBots)
+        {
+            ALRBot* Bot = Cast<ALRBot>(Actor);
+            if (!Bot || Bot->bIsDead) continue;
+            if (FVector::Dist(GetActorLocation(), Bot->GetActorLocation()) > TakedownRange) continue;
+
+            const float Angle = FMath::RadiansToDegrees(FMath::Acos(
+                FVector::DotProduct(Bot->GetActorForwardVector(),
+                    (GetActorLocation() - Bot->GetActorLocation()).GetSafeNormal())));
+            if (Angle >= (180.f - TakedownAngle)) { bCanTakedown = true; break; }
+        }
+
+        if (bCanTakedown)
+        {
+            FText TakedownPrompt = FText::FromString(TEXT("[F] 제압하기"));
+            if (!TakedownPrompt.EqualTo(CurrentPromptText))
+            {
+                CurrentPromptText = TakedownPrompt;
+                OnInteractionPromptChanged.Broadcast(CurrentPromptText);
+            }
+            return; // 제압 프롬프트 표시 중엔 다른 프롬프트 표시 안 함
+        }
+    }
+
     // --- 상호작용 프롬프트 (조준 중인 오브젝트 표시) ---
     // 보관함이 열려 있으면 "E: 보관함 닫기" 고정 표시
     if (bStorageOpen)
@@ -566,6 +603,40 @@ void ALRCharacter::TryInteract()
             }
         }
     }
+}
+
+void ALRCharacter::TryTakedown()
+{
+    const float TakedownRange = 150.f;
+    const float TakedownAngle = 60.f; // 등 방향 ±60도
+
+    TArray<AActor*> NearBots;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), ALRBot::StaticClass(), NearBots);
+
+    for (AActor* Actor : NearBots)
+    {
+        ALRBot* Bot = Cast<ALRBot>(Actor);
+        if (!Bot || Bot->bIsDead) continue;
+
+        const float Dist = FVector::Dist(GetActorLocation(), Bot->GetActorLocation());
+        if (Dist > TakedownRange) continue;
+
+        // 봇의 등 방향 체크 — 플레이어가 봇 뒤에 있는지
+        const FVector ToBotForward = Bot->GetActorForwardVector();
+        const FVector ToPlayer = (GetActorLocation() - Bot->GetActorLocation()).GetSafeNormal();
+        const float DotProduct = FVector::DotProduct(ToBotForward, ToPlayer);
+        const float AngleDeg = FMath::RadiansToDegrees(FMath::Acos(DotProduct));
+
+        // DotProduct > 0 이면 플레이어가 봇 앞쪽 → 제압 불가
+        // AngleDeg > 180 - TakedownAngle 이면 봇 등 방향
+        if (AngleDeg < (180.f - TakedownAngle)) continue;
+
+        Bot->TakedownKill();
+        UE_LOG(LogTemp, Warning, TEXT("[Takedown] 제압 성공!"));
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[Takedown] 제압 실패 — 조건 미충족"));
 }
 
 void ALRCharacter::CancelSearch()

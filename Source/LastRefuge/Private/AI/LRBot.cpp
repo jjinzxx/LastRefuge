@@ -1,6 +1,8 @@
 #include "AI/LRBot.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "AIController.h"
 
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -69,25 +71,25 @@ FVector ALRBot::GetPatrolPointLocation(int32 Index, bool& bIsValid) const
 void ALRBot::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
 
-#if WITH_EDITOR
-	// 봇 전방 방향 화살표 (파란색)
-	const FVector Start = GetActorLocation();
-	const FVector Forward = GetActorForwardVector();
-	const FVector End = Start + Forward * 150.f;
+void ALRBot::TakedownKill()
+{
+	if (bIsDead) return;
+	bIsDead = true;
 
-	DrawDebugDirectionalArrow(
-		GetWorld(),
-		Start,
-		End,
-		30.f,        // 화살표 크기
-		FColor::Blue,
-		false,       // 지속 여부
-		-1.f,        // 지속 시간 (-1 = 1프레임)
-		0,
-		3.f          // 선 두께
-	);
-#endif
+	if (DeathMontage)
+		GetMesh()->GetAnimInstance()->Montage_Play(DeathMontage);
+
+	// 충돌/AI 비활성화
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetCharacterMovement()->DisableMovement();
+
+	if (AAIController* AIC = Cast<AAIController>(GetController()))
+		AIC->UnPossess();
+
+	// 3초 후 제거
+	SetLifeSpan(3.f);
 }
 
 void ALRBot::SetBotState(ELRBotState NewState)
