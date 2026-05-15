@@ -38,7 +38,7 @@ void ALRDoor::EndInteract(ALRCharacter* Player)
 		return;
 	}
 
-	// 인벤토리 직렬화 (FLRGridItem — 위치 정보 포함)
+	// 인벤토리 직렬화
 	if (ULRInventoryGridComponent* InvGrid = Player->GetInventoryGrid())
 	{
 		GI->PersistentInventory.Empty();
@@ -48,6 +48,9 @@ void ALRDoor::EndInteract(ALRCharacter* Player)
 				GI->PersistentInventory.Add(Item);
 		}
 	}
+
+	// 툴바 직렬화
+	GI->PersistentToolbarItems = Player->GetToolbarItems();
 
 	// 보관함 직렬화 (기지 출구에만 bSaveStorage = true)
 	if (bSaveStorage)

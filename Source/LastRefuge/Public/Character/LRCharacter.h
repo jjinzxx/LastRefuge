@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Items/LRInventoryStructs.h"
 #include "LRCharacter.generated.h"
 
 class ULRStatusComponent;
@@ -14,7 +15,9 @@ class ULRInventoryGridComponent;
 class ULRInventoryGridWidget;
 class ULRStorageWidget;
 class ULRHudWidget;
+class ULRPauseMenuWidget;
 class UCanvasPanelSlot;
+class ULRItemDataAsset;
 
 UENUM(BlueprintType)
 enum class ELRMovementState : uint8
@@ -32,6 +35,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSearchStarted, FText, ProgressBas
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSearchEnded, bool, bCompleted, FText, StatusText);
 // 조준 중인 오브젝트의 프롬프트 텍스트 변경 (비어있으면 프롬프트 숨김)
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractionPromptChanged, FText, Prompt);
+
+// 툴바 슬롯 변경 (SlotIndex 0~3, ItemData=null이면 빈 슬롯, Quantity=총 보유 수량)
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnToolbarSlotChanged, int32, SlotIndex, ULRItemDataAsset*, ItemData, int32, Quantity);
 
 UCLASS()
 class LASTREFUGE_API ALRCharacter : public ACharacter
@@ -57,9 +63,22 @@ private:
 
     bool bInventoryOpen  = false;
     bool bStorageOpen    = false;
+    bool bPauseMenuOpen  = false;
     bool bIgnoreLookInput = false;
 
+    UPROPERTY()
+    TObjectPtr<ULRPauseMenuWidget> PauseMenuWidget;
+
     void ToggleInventory();
+
+    // 툴바 데이터 (실제 아이템 보관, 빈 슬롯 = IsEmpty()==true)
+    TArray<FLRGridItem> ToolbarItems;
+
+    // EnhancedInput 바인딩용 — 파라미터 포함 시그니처
+    void HandleToolbar1(const FInputActionValue&) { UseToolbarSlot(0); }
+    void HandleToolbar2(const FInputActionValue&) { UseToolbarSlot(1); }
+    void HandleToolbar3(const FInputActionValue&) { UseToolbarSlot(2); }
+    void HandleToolbar4(const FInputActionValue&) { UseToolbarSlot(3); }
 
 public:
     ALRCharacter();
@@ -72,6 +91,42 @@ public:
     void OpenStorageScreen(class ULRInventoryGridComponent* InStorageGrid);
     void CloseStorageScreen();
 
+    // === 툴바 ===
+    static constexpr int32 ToolbarSize = 4;
+
+    UPROPERTY(BlueprintAssignable, Category = "LR|UI")
+    FOnToolbarSlotChanged OnToolbarSlotChanged;
+
+    // 슬롯에 아이템 저장 (드래그 드롭 후 LRToolbarSlotWidget에서 호출)
+    void SetToolbarSlot(int32 SlotIndex, const FLRGridItem& Item);
+
+    // 슬롯 비우기 — 아이템이 있으면 인벤토리로 반환
+    void ClearToolbarSlot(int32 SlotIndex);
+
+    // 슬롯에서 아이템 꺼내기 — 인벤 반환 없이 제거 (드래그 시작 시 사용)
+    FLRGridItem TakeToolbarItem(int32 SlotIndex);
+
+    // 1~4 키 → 해당 슬롯 아이템 즉시 사용
+    void UseToolbarSlot(int32 SlotIndex);
+
+    const TArray<FLRGridItem>& GetToolbarItems() const { return ToolbarItems; }
+
+    // 툴바 단축키 InputAction (에디터에서 할당)
+    UPROPERTY(EditAnywhere, Category = "Input|Toolbar")
+    TObjectPtr<UInputAction> IA_Toolbar1;
+
+    UPROPERTY(EditAnywhere, Category = "Input|Toolbar")
+    TObjectPtr<UInputAction> IA_Toolbar2;
+
+    UPROPERTY(EditAnywhere, Category = "Input|Toolbar")
+    TObjectPtr<UInputAction> IA_Toolbar3;
+
+    UPROPERTY(EditAnywhere, Category = "Input|Toolbar")
+    TObjectPtr<UInputAction> IA_Toolbar4;
+
+    // ESC 일시정지 메뉴 토글 (LRPauseMenuWidget에서도 호출)
+    void TogglePauseMenu();
+
     // === HUD ===
     UPROPERTY(EditDefaultsOnly, Category = "UI")
     TSubclassOf<ULRHudWidget> HudWidgetClass;
@@ -81,6 +136,13 @@ public:
 
     UPROPERTY(EditDefaultsOnly, Category = "UI")
     TSubclassOf<ULRStorageWidget> StorageWidgetClass;
+
+    UPROPERTY(EditDefaultsOnly, Category = "UI")
+    TSubclassOf<ULRPauseMenuWidget> PauseMenuWidgetClass;
+
+    // ESC 키 InputAction (에디터에서 할당)
+    UPROPERTY(EditAnywhere, Category = "Input")
+    TObjectPtr<UInputAction> IA_Menu;
 
     // === UI 델리게이트 ===
     UPROPERTY(BlueprintAssignable, Category = "LR|UI")

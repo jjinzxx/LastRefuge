@@ -8,6 +8,8 @@ class UProgressBar;
 class UTextBlock;
 class ULRStatusComponent;
 class ALRCharacter;
+class ULRToolbarSlotWidget;
+class ULRItemDataAsset;
 
 UCLASS()
 class LASTREFUGE_API ULRHudWidget : public UUserWidget
@@ -31,6 +33,19 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> TB_Prompt;
+
+	// --- 툴바 슬롯 (WBP_LRHud에 ToolbarSlot1~4 이름으로 배치) ---
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<ULRToolbarSlotWidget> ToolbarSlot1;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<ULRToolbarSlotWidget> ToolbarSlot2;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<ULRToolbarSlotWidget> ToolbarSlot3;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<ULRToolbarSlotWidget> ToolbarSlot4;
 
 private:
 	UPROPERTY()
@@ -66,4 +81,12 @@ private:
 
 	UFUNCTION()
 	void OnInteractionPromptChanged(FText Prompt);
+
+	UFUNCTION()
+	void OnToolbarSlotChanged(int32 SlotIndex, ULRItemDataAsset* ItemData, int32 Quantity);
+
+	// OnGridChanged 구독 — 인벤토리 변경 시 툴바 수량 자동 갱신
+	void RefreshAllToolbarSlots();
+
+	ULRToolbarSlotWidget* GetToolbarSlotWidget(int32 Index) const;
 };

@@ -18,8 +18,10 @@
 #include "UI/LRHudWidget.h"
 #include "UI/LRInventoryGridWidget.h"
 #include "UI/LRStorageWidget.h"
+#include "UI/LRPauseMenuWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "Items/LRItemDataAsset.h"
 #include "Interfaces/LRInteractable.h"
 
@@ -54,6 +56,7 @@ ALRCharacter::ALRCharacter()
     StimuliSource->bAutoRegister = true;
 
     InventoryGrid = CreateDefaultSubobject<ULRInventoryGridComponent>(TEXT("InventoryGrid"));
+    ToolbarItems.SetNum(ToolbarSize);
 }
 
 void ALRCharacter::BeginPlay()
@@ -74,6 +77,12 @@ void ALRCharacter::BeginPlay()
                     if (!Item.IsEmpty())
                         InventoryGrid->PlaceItem(Item.GridX, Item.GridY, Item, Item.bIsRotated);
                 }
+
+                // 툴바 복원
+                for (int32 i = 0; i < GI->PersistentToolbarItems.Num() && i < ToolbarSize; ++i)
+                {
+                    ToolbarItems[i] = GI->PersistentToolbarItems[i];
+                }
             }
         }
     }
@@ -90,6 +99,14 @@ void ALRCharacter::BeginPlay()
         }
     }
     
+    // 레벨 전환 후 Input Mode 초기화 (메인 메뉴 → 게임 진입 시 UI 모드 잔존 방지)
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        PC->SetShowMouseCursor(false);
+        PC->SetInputMode(FInputModeGameOnly());
+        PC->ResetIgnoreMoveInput();
+    }
+
     StatusComponent->OnHealthChanged.AddDynamic(this, &ALRCharacter::OnHealthChanged);
 
     // HUD 생성 (로컬 플레이어만)
@@ -135,6 +152,14 @@ void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
         // 인벤토리 열기/닫기 (Tab키 — 에디터에서 IA_Inventory 할당 필요)
         if (IA_Inventory)
             EIC->BindAction(IA_Inventory, ETriggerEvent::Started, this, &ALRCharacter::ToggleInventory);
+
+        if (IA_Toolbar1) EIC->BindAction(IA_Toolbar1, ETriggerEvent::Started, this, &ALRCharacter::HandleToolbar1);
+        if (IA_Toolbar2) EIC->BindAction(IA_Toolbar2, ETriggerEvent::Started, this, &ALRCharacter::HandleToolbar2);
+        if (IA_Toolbar3) EIC->BindAction(IA_Toolbar3, ETriggerEvent::Started, this, &ALRCharacter::HandleToolbar3);
+        if (IA_Toolbar4) EIC->BindAction(IA_Toolbar4, ETriggerEvent::Started, this, &ALRCharacter::HandleToolbar4);
+
+        if (IA_Menu)
+            EIC->BindAction(IA_Menu, ETriggerEvent::Started, this, &ALRCharacter::TogglePauseMenu);
     }
 }
 
@@ -193,11 +218,14 @@ void ALRCharacter::Look(const FInputActionValue& Value)
     if (bIgnoreLookInput) return;
 
     const FVector2D LookVector = Value.Get<FVector2D>();
-    if (Controller)
-    {
-        AddControllerYawInput(LookVector.X);
-        AddControllerPitchInput(LookVector.Y);
-    }
+    if (!Controller) return;
+
+    float Sensitivity = 1.0f;
+    if (ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance()))
+        Sensitivity = GI->MouseSensitivity;
+
+    AddControllerYawInput(LookVector.X * Sensitivity);
+    AddControllerPitchInput(LookVector.Y * Sensitivity);
 }
 
 void ALRCharacter::StartJump(const FInputActionValue& Value)
@@ -660,4 +688,109 @@ void ALRCharacter::CloseStorageScreen()
     }
 
     UE_LOG(LogTemp, Warning, TEXT("[Storage] 보관함 UI 닫힘"));
+}
+
+// ──────────────────────────────────────────────────────────
+// 툴바
+// ──────────────────────────────────────────────────────────
+void ALRCharacter::SetToolbarSlot(int32 SlotIndex, const FLRGridItem& Item)
+{
+    if (!ToolbarItems.IsValidIndex(SlotIndex)) return;
+    ToolbarItems[SlotIndex] = Item;
+    OnToolbarSlotChanged.Broadcast(SlotIndex, Item.ItemData, Item.Quantity);
+}
+
+void ALRCharacter::ClearToolbarSlot(int32 SlotIndex)
+{
+    if (!ToolbarItems.IsValidIndex(SlotIndex)) return;
+
+    FLRGridItem Item = ToolbarItems[SlotIndex];
+    if (!Item.IsEmpty() && InventoryGrid)
+    {
+        int32 OutX, OutY; bool bRot;
+        if (InventoryGrid->FindEmptySpace(Item, OutX, OutY, bRot))
+            InventoryGrid->PlaceItem(OutX, OutY, Item, bRot);
+        else
+            UE_LOG(LogTemp, Warning, TEXT("[Toolbar] ClearSlot %d: 인벤 공간 없음 — 아이템 유실"), SlotIndex);
+    }
+
+    ToolbarItems[SlotIndex] = FLRGridItem();
+    OnToolbarSlotChanged.Broadcast(SlotIndex, nullptr, 0);
+}
+
+FLRGridItem ALRCharacter::TakeToolbarItem(int32 SlotIndex)
+{
+    if (!ToolbarItems.IsValidIndex(SlotIndex)) return FLRGridItem();
+    FLRGridItem Item = ToolbarItems[SlotIndex];
+    ToolbarItems[SlotIndex] = FLRGridItem();
+    OnToolbarSlotChanged.Broadcast(SlotIndex, nullptr, 0);
+    return Item;
+}
+
+void ALRCharacter::UseToolbarSlot(int32 SlotIndex)
+{
+    if (!ToolbarItems.IsValidIndex(SlotIndex)) return;
+    if (bInventoryOpen || bStorageOpen) return;
+
+    FLRGridItem& Item = ToolbarItems[SlotIndex];
+    if (Item.IsEmpty() || !Item.ItemData) return;
+    if (Item.ItemData->ItemType != ELRItemType::Consumable) return;
+
+    if (StatusComponent)
+    {
+        StatusComponent->RestoreHealth(Item.ItemData->HealthRestore);
+        StatusComponent->RestoreStamina(Item.ItemData->StaminaRestore);
+    }
+
+    Item.Quantity--;
+    if (Item.Quantity <= 0)
+    {
+        ToolbarItems[SlotIndex] = FLRGridItem();
+        OnToolbarSlotChanged.Broadcast(SlotIndex, nullptr, 0);
+    }
+    else
+    {
+        OnToolbarSlotChanged.Broadcast(SlotIndex, Item.ItemData, Item.Quantity);
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// ESC 일시정지 메뉴
+// ──────────────────────────────────────────────────────────
+void ALRCharacter::TogglePauseMenu()
+{
+    // 인벤토리/보관함이 열려 있으면 ESC로 닫기
+    if (bInventoryOpen) { ToggleInventory(); return; }
+    if (bStorageOpen)   { CloseStorageScreen(); return; }
+
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC) return;
+
+    if (!bPauseMenuOpen)
+    {
+        if (!PauseMenuWidgetClass)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[PauseMenu] PauseMenuWidgetClass null — BP_LRCharacter에서 WBP_PauseMenu 할당 필요"));
+            return;
+        }
+        if (!PauseMenuWidget)
+            PauseMenuWidget = CreateWidget<ULRPauseMenuWidget>(PC, PauseMenuWidgetClass);
+        if (!PauseMenuWidget) return;
+
+        PauseMenuWidget->AddToViewport(10);
+        PC->SetShowMouseCursor(true);
+        PC->SetInputMode(FInputModeGameAndUI());
+        UGameplayStatics::SetGamePaused(this, true);
+        bPauseMenuOpen   = true;
+        bIgnoreLookInput = true;
+    }
+    else
+    {
+        PauseMenuWidget->RemoveFromParent();
+        PC->SetShowMouseCursor(false);
+        PC->SetInputMode(FInputModeGameOnly());
+        UGameplayStatics::SetGamePaused(this, false);
+        bPauseMenuOpen   = false;
+        bIgnoreLookInput = false;
+    }
 }

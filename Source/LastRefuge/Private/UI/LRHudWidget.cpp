@@ -1,6 +1,9 @@
 #include "UI/LRHudWidget.h"
 #include "Character/LRCharacter.h"
 #include "Components/LRStatusComponent.h"
+#include "Components/LRInventoryGridComponent.h"
+#include "UI/LRToolbarSlotWidget.h"
+#include "Items/LRItemDataAsset.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "TimerManager.h"
@@ -27,6 +30,19 @@ void ULRHudWidget::NativeConstruct()
 	OwnerCharacter->OnSearchStarted.AddDynamic(this, &ULRHudWidget::OnSearchStarted);
 	OwnerCharacter->OnSearchEnded.AddDynamic(this, &ULRHudWidget::OnSearchEnded);
 	OwnerCharacter->OnInteractionPromptChanged.AddDynamic(this, &ULRHudWidget::OnInteractionPromptChanged);
+	OwnerCharacter->OnToolbarSlotChanged.AddDynamic(this, &ULRHudWidget::OnToolbarSlotChanged);
+
+	// 툴바 슬롯 초기화
+	for (int32 i = 0; i < ALRCharacter::ToolbarSize; ++i)
+	{
+		if (ULRToolbarSlotWidget* ToolbarSlot = GetToolbarSlotWidget(i))
+			ToolbarSlot->InitSlot(OwnerCharacter, i);
+	}
+
+	// (툴바는 OnToolbarSlotChanged로만 갱신 — OnGridChanged 구독 불필요)
+
+	// 초기 빈 슬롯 상태 표시
+	RefreshAllToolbarSlots();
 
 	TB_Prompt->SetVisibility(ESlateVisibility::Hidden);
 }
@@ -118,5 +134,42 @@ void ULRHudWidget::OnInteractionPromptChanged(FText Prompt)
 	{
 		TB_Prompt->SetText(Prompt);
 		TB_Prompt->SetVisibility(ESlateVisibility::Visible);
+	}
+}
+
+// --- 툴바 ---
+
+ULRToolbarSlotWidget* ULRHudWidget::GetToolbarSlotWidget(int32 Index) const
+{
+	switch (Index)
+	{
+	case 0: return ToolbarSlot1;
+	case 1: return ToolbarSlot2;
+	case 2: return ToolbarSlot3;
+	case 3: return ToolbarSlot4;
+	default: return nullptr;
+	}
+}
+
+void ULRHudWidget::OnToolbarSlotChanged(int32 SlotIndex, ULRItemDataAsset* ItemData, int32 Quantity)
+{
+	if (ULRToolbarSlotWidget* ToolbarSlot = GetToolbarSlotWidget(SlotIndex))
+		ToolbarSlot->RefreshSlot(ItemData, Quantity);
+}
+
+void ULRHudWidget::RefreshAllToolbarSlots()
+{
+	if (!OwnerCharacter) return;
+	const TArray<FLRGridItem>& Items = OwnerCharacter->GetToolbarItems();
+
+	for (int32 i = 0; i < ALRCharacter::ToolbarSize; ++i)
+	{
+		ULRToolbarSlotWidget* SlotWidget = GetToolbarSlotWidget(i);
+		if (!SlotWidget) continue;
+
+		if (!Items.IsValidIndex(i) || Items[i].IsEmpty())
+			SlotWidget->RefreshSlot(nullptr, 0);
+		else
+			SlotWidget->RefreshSlot(Items[i].ItemData, Items[i].Quantity);
 	}
 }

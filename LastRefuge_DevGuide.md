@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 14 완료)
+# Last Refuge - 개발 인수인계 문서 (Day 15 진행 중)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -39,7 +39,7 @@ Content/
     ├── Characters/
     ├── DataAssets/      # DA_Scrap, DA_Medkit, DA_Ration (ItemID, GridWidth, GridHeight 설정 필요)
     ├── Input/           # IMC_Default, IA_Move, IA_Look, IA_Jump, IA_Crouch, IA_Sprint, IA_Interact, IA_Inventory
-    ├── Maps/            # L_Base, L_DangerZone
+    ├── Maps/            # L_Base, L_DangerZone, L_MainMenu
     └── AI/              # BT_LRBot, BB_LRBot
 
 Source/LastRefuge/
@@ -51,7 +51,8 @@ Source/LastRefuge/
 │   ├── Items/           # LRItemDataAsset.h, LRInventoryStructs.h
 │   ├── Actors/          # LRContainer.h, LRStorage.h, LRDoor.h  ← Day 13: Items/에서 이동
 │   └── UI/              # LRHudWidget.h, LRInventoryGridWidget.h, LRItemWidget.h,
-│                        #   LRDragPreviewWidget.h, LRItemDragDropOperation.h, LRStorageWidget.h
+│                        #   LRDragPreviewWidget.h, LRItemDragDropOperation.h, LRStorageWidget.h,
+│                        #   LRToolbarSlotWidget.h, LRPauseMenuWidget.h, LRMainMenuWidget.h
 └── Private/
     └── (동일 구조)
 ```
@@ -103,10 +104,11 @@ Source/LastRefuge/
 - WBP_Storage Designer: Canvas Panel 2개(`InventoryContainer`, `StorageContainer`)만 배치.
   WBP_InventoryGrid 직접 배치 금지 (C++에서 동적 생성)
 
-### ULRSaveGame (LRSaveGame.h/.cpp) — Day 13 신규
+### ULRSaveGame (LRSaveGame.h/.cpp) — Day 13 신규, Day 15 수정
 - SlotName: `"LRInventorySave"`
-- `Save(InvGrid, StorageGrid, WorldCtx)`: 두 그리드 직렬화 → `TArray<FLRSavedItem>`
-- `Load(InvGrid, StorageGrid, ItemRegistry, WorldCtx)`: 그리드 초기화 후 복원. 배치 충돌 시 FindEmptySpace 폴백
+- `Save(InvGrid, StorageGrid, ToolbarItems, WorldCtx)`: 인벤/보관함/툴바 직렬화 → `TArray<FLRSavedItem>`
+- `Load(InvGrid, StorageGrid, OutToolbarItems, ItemRegistry, WorldCtx)`: 그리드 초기화 후 복원. 배치 충돌 시 FindEmptySpace 폴백
+- `FLRSavedItem`에 `bool bIsToolbar = false`, `int32 ToolbarSlot = -1` 필드 추가 (Day 15)
 
 ### FLRGridItem / FLRSavedItem (Items/LRInventoryStructs.h) — Day 13 수정
 ```cpp
@@ -195,7 +197,7 @@ USTRUCT() FLRSavedItem {
 | Day 12 | Minimum Viable HUD (ULRHudWidget, 점 애니메이션, 완료/취소 텍스트) | ✅ 완료 |
 | Day 13 | **타르코프 스타일 그리드 인벤토리 + 보관함 분할 UI** | ✅ 완료 |
 | Day 14 | **그리드 UI 버그 수정 + 아이템 스태킹 + 좌/우클릭 분리 + 컨텍스트 메뉴** | ✅ 완료 |
-| Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | ⬜ 미완료 |
+| Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | 🔄 진행 중 (툴바·ESC·메인화면 완료) |
 
 ---
 

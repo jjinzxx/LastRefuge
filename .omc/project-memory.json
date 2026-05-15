@@ -1,0 +1,248 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778808802776,
+  "projectRoot": "C:\\Users\\user\\Desktop\\unreal-study\\LastRefuge",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "Binaries": {
+      "path": "Binaries",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778808802743,
+      "keyFiles": []
+    },
+    "Config": {
+      "path": "Config",
+      "purpose": "Configuration files",
+      "fileCount": 5,
+      "lastAccessed": 1778808802743,
+      "keyFiles": [
+        "DefaultEditor.ini",
+        "DefaultEditorPerProjectUserSettings.ini",
+        "DefaultEngine.ini",
+        "DefaultGame.ini",
+        "DefaultInput.ini"
+      ]
+    },
+    "Content": {
+      "path": "Content",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778808802744,
+      "keyFiles": []
+    },
+    "DerivedDataCache": {
+      "path": "DerivedDataCache",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778808802744,
+      "keyFiles": []
+    },
+    "Intermediate": {
+      "path": "Intermediate",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1778808802744,
+      "keyFiles": [
+        "CachedAssetRegistryDiscovery.bin",
+        "CachedAssetRegistry_0.bin",
+        "TargetInfo.Engine.json",
+        "TargetInfo.json",
+        "TargetInfo.LastRefuge.json"
+      ]
+    },
+    "Saved": {
+      "path": "Saved",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778808802745,
+      "keyFiles": [
+        "AutoScreenshot.png"
+      ]
+    },
+    "Source": {
+      "path": "Source",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778808802745,
+      "keyFiles": [
+        "LastRefuge.Target.cs",
+        "LastRefugeEditor.Target.cs"
+      ]
+    },
+    "Intermediate\\Build": {
+      "path": "Intermediate\\Build",
+      "purpose": "Build output",
+      "fileCount": 2,
+      "lastAccessed": 1778808802747,
+      "keyFiles": [
+        "SourceFileCache.bin",
+        "XmlConfigCache.bin"
+      ]
+    },
+    "Saved\\Config": {
+      "path": "Saved\\Config",
+      "purpose": "Configuration files",
+      "fileCount": 0,
+      "lastAccessed": 1778808802747,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "Source\\LastRefuge\\Private\\Character\\LRCharacter.cpp",
+      "accessCount": 15,
+      "lastAccessed": 1778815669611,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\Character\\LRCharacter.h",
+      "accessCount": 12,
+      "lastAccessed": 1778811803634,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Private\\UI\\LRHudWidget.cpp",
+      "accessCount": 9,
+      "lastAccessed": 1778811489672,
+      "type": "file"
+    },
+    {
+      "path": "LastRefuge_DevGuide.md",
+      "accessCount": 8,
+      "lastAccessed": 1778816690537,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\UI\\LRToolbarSlotWidget.h",
+      "accessCount": 4,
+      "lastAccessed": 1778811446643,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Private\\UI\\LRToolbarSlotWidget.cpp",
+      "accessCount": 4,
+      "lastAccessed": 1778811469716,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\UI\\LRHudWidget.h",
+      "accessCount": 3,
+      "lastAccessed": 1778809473168,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\LRGameInstance.h",
+      "accessCount": 3,
+      "lastAccessed": 1778813362805,
+      "type": "file"
+    },
+    {
+      "path": "Source/LastRefuge/Private",
+      "accessCount": 2,
+      "lastAccessed": 1778811286535,
+      "type": "directory"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\Items\\LRInventoryStructs.h",
+      "accessCount": 2,
+      "lastAccessed": 1778811309621,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\LRSaveGame.h",
+      "accessCount": 2,
+      "lastAccessed": 1778811329895,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Private\\LRSaveGame.cpp",
+      "accessCount": 2,
+      "lastAccessed": 1778811350301,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Private\\Actors\\LRDoor.cpp",
+      "accessCount": 2,
+      "lastAccessed": 1778811501041,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Private\\UI\\LRMainMenuWidget.cpp",
+      "accessCount": 2,
+      "lastAccessed": 1778813755153,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\Items\\LRItemDataAsset.h",
+      "accessCount": 1,
+      "lastAccessed": 1778808921522,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\Components\\LRInventoryGridComponent.h",
+      "accessCount": 1,
+      "lastAccessed": 1778809008471,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\UI\\LRItemDragDropOperation.h",
+      "accessCount": 1,
+      "lastAccessed": 1778809008631,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\Components\\LRStatusComponent.h",
+      "accessCount": 1,
+      "lastAccessed": 1778811208907,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\UI\\LRPauseMenuWidget.h",
+      "accessCount": 1,
+      "lastAccessed": 1778811764698,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Private\\UI\\LRPauseMenuWidget.cpp",
+      "accessCount": 1,
+      "lastAccessed": 1778811773578,
+      "type": "file"
+    },
+    {
+      "path": "Source\\LastRefuge\\Public\\UI\\LRMainMenuWidget.h",
+      "accessCount": 1,
+      "lastAccessed": 1778813345046,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

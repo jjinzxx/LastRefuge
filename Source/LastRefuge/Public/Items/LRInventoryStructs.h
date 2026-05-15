@@ -85,5 +85,11 @@ struct FLRSavedItem
 	bool bIsStorage = false; // true = 창고, false = 인벤토리
 
 	UPROPERTY()
+	bool bIsToolbar = false; // true = 툴바 슬롯
+
+	UPROPERTY()
+	int32 ToolbarSlot = -1; // 툴바 슬롯 인덱스 (0~3), bIsToolbar=true일 때만 유효
+
+	UPROPERTY()
 	int32 Quantity = 1;
 };

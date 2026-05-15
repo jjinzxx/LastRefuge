@@ -32,21 +32,18 @@ public:
 	UPROPERTY()
 	TArray<FLRSavedItem> SavedItems;
 
-	/**
-	 * 두 그리드의 현재 상태를 SaveGame 슬롯에 기록.
-	 * @param WorldCtx  GetWorld() 가능한 임의의 UObject
-	 */
+	// 직렬화된 툴바 슬롯 (최대 4개)
+	UPROPERTY()
+	TArray<FLRSavedItem> SavedToolbarItems;
+
 	static void Save(ULRInventoryGridComponent* InvGrid,
 	                 ULRInventoryGridComponent* StorageGrid,
+	                 const TArray<FLRGridItem>& ToolbarItems,
 	                 UObject* WorldCtx);
 
-	/**
-	 * SaveGame 슬롯에서 두 그리드를 복원.
-	 * ItemRegistry에 없는 ItemID는 경고 후 스킵.
-	 * @param ItemRegistry  "ItemID" → DataAsset* 맵 (호출 측에서 구성)
-	 */
 	static void Load(ULRInventoryGridComponent* InvGrid,
 	                 ULRInventoryGridComponent* StorageGrid,
+	                 TArray<FLRGridItem>& OutToolbarItems,
 	                 const TMap<FString, ULRItemDataAsset*>& ItemRegistry,
 	                 UObject* WorldCtx);
 };

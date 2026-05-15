@@ -18,6 +18,10 @@ public:
 	UPROPERTY()
 	TArray<FLRGridItem> PersistentStorageItems;
 
+	// 툴바 슬롯 보존 (크기 4, 빈 슬롯은 IsEmpty()==true)
+	UPROPERTY()
+	TArray<FLRGridItem> PersistentToolbarItems;
+
 	// 레벨 이동이 한 번이라도 일어났는지 (초기 스폰과 구분)
 	bool bHasTravelData = false;
 
@@ -26,6 +30,13 @@ public:
 	UPROPERTY()
 	TMap<FString, TObjectPtr<class ULRItemDataAsset>> ItemRegistry;
 	
+	// 플레이어 설정 (메인 메뉴에서 저장)
+	UPROPERTY()
+	float MouseSensitivity = 1.0f;
+
+	UPROPERTY()
+	float MasterVolume = 1.0f;
+
 	virtual void Init() override;
 	void RegisterItemAssets();
 };
