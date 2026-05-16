@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 16 완료)
+# Last Refuge - 개발 인수인계 문서 (Day 17 진행 중)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -152,9 +152,18 @@ USTRUCT() FLRSavedItem {
 - 레벨 전환 전 인벤 저장: `GetInventoryGrid()->GetItems()` → FLRGridItem 배열
 - 보관함 저장: `StorageActor->GetStorageGrid()->GetItems()` → FLRGridItem 배열
 
-### ULRHudWidget (UI/LRHudWidget.h/.cpp) — Day 12 완비
-- HP/스테미나/소음 Progress Bar, 상호작용 프롬프트 텍스트
-- 수색 진행 점 애니메이션 (0.4초 간격), 완료/취소 텍스트 2초 표시
+### ULRHudWidget (UI/LRHudWidget.h/.cpp) — Day 17 수정
+- **[Day 12]** 상호작용 프롬프트 텍스트, 수색 진행 텍스트, 완료/취소 텍스트 2초 표시
+- **[Day 16]** 수색 시간 표시 `(현재 / 전체 sec)` 텍스트 애니메이션
+- **[Day 17]** HP/STA 바: `ULRSegmentBarWidget` (NativePaint) → `UProgressBar` (`PB_HP`, `PB_Sta`) 교체
+  - `OnHealthChanged`: `PB_HP->SetPercent(NewHealth / MaxHealth)`
+  - `OnStaminaChanged`: `PB_Sta->SetPercent(NewStamina / MaxStamina)`
+  - WBP_LRHud: 커스텀 프레임 이미지(`Image_HUDFrame`) 오버레이 구조
+- **[Day 17]** `ULRStatusComponent` — `GetMaxHealth()`, `GetMaxStamina()` getter 추가
+
+### ULRSegmentBarWidget (UI/LRSegmentBarWidget.h/.cpp) — Day 17 폐기
+- NativePaint 기반 세그먼트 바로 구현했으나 UUserWidget의 Slate 캐싱 문제로 실시간 갱신 불가
+- UProgressBar + 프레임 이미지 오버레이 방식으로 대체, 현재 미사용
 
 ---
 
@@ -203,7 +212,8 @@ USTRUCT() FLRSavedItem {
 | Day 13 | **타르코프 스타일 그리드 인벤토리 + 보관함 분할 UI** | ✅ 완료 |
 | Day 14 | **그리드 UI 버그 수정 + 아이템 스태킹 + 좌/우클릭 분리 + 컨텍스트 메뉴** | ✅ 완료 |
 | Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | ✅ 완료 (1인칭 손·다리 제외 — 풀바디로 멀티 시 구현 예정) |
-| Day 16 | **플레이어 공격 + 봇 체력/피격 시스템 + QA 버그 수정 + 밸런싱** | ✅ 완료 |
+| Day 16 | **플레이어 공격 + 봇 체력/피격 시스템 + QA 버그 수정 + 밸런싱** | 완료 |
+| Day 17 | **HUD 비주얼 개선 — HP/STA 커스텀 프레임 이미지 + ProgressBar 전환** | 진행 중 |
 
 ---
 
@@ -480,10 +490,48 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 
 ---
 
+## Day 17 — HUD 비주얼 개선 (진행 중)
+
+### 완료 — HP/STA 바 시스템 교체
+
+**배경:**
+- NativePaint 기반 `ULRSegmentBarWidget` 구현 → Slate SInvalidationPanel 캐싱으로 실시간 갱신 불가
+- `Invalidate(Paint)`, `RegisterActiveTimer`, `SetVolatile` 등 다수 방법 시도 모두 실패
+- UProgressBar + 커스텀 프레임 이미지 오버레이 방식으로 전환
+
+**ULRHudWidget 변경:**
+- `ULRSegmentBarWidget* PB_HP / PB_Stamina` → `UProgressBar* PB_HP / PB_Sta`
+- `#include "Components/ProgressBar.h"` 교체
+- `OnHealthChanged`: `PB_HP->SetPercent()`
+- `OnStaminaChanged`: `PB_Sta->SetPercent()`
+
+**ULRStatusComponent 변경:**
+- `GetMaxHealth()` / `GetMaxStamina()` getter 추가
+
+**WBP_LRHud 구성:**
+```
+Canvas Panel
+├── PB_HP         (UProgressBar, Fill Color 흰색, 배경 투명)
+├── PB_Sta        (UProgressBar, Fill Color 흰색, 배경 투명)
+└── Image_HUDFrame (커스텀 프레임 이미지, 맨 앞 레이어)
+```
+
+**M_StaFill (신규, 현재 미사용):**
+- Material Domain: User Interface, Blend Mode: Masked
+- UV 기반 평행사변형 마스크: `U - (1-V)*Skew → OpacityMask`
+- STA 바를 직사각형으로 단순화하기로 결정, 추후 프레임 이미지 교체 예정
+
+### 미완료 — HUD 정렬 및 마무리
+- PB_HP / PB_Sta 크기와 위치를 Image_HUDFrame 각 칸 내부에 정확히 정렬
+- STA 바 프레임 이미지를 직사각형 버전으로 교체
+- 피격 시 HP 감소 / 달리기 시 STA 감소 인게임 동작 최종 확인
+
+---
+
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, Day 16 완료 상태에서 이어서.
+Last Refuge UE5.7 C++ 프로젝트, Day 17 진행 중 상태에서 이어서.
 엔진: UE 5.7.4, IDE: Rider, 접두사: LR
 
 Day 13: 타르코프 스타일 그리드 인벤토리(ULRInventoryGridComponent, 10×5, 드래그앤드롭, 회전, Shift+클릭 이동),
@@ -494,13 +542,20 @@ Day 15: 툴바 별도 물리 공간(TArray<FLRGridItem> ToolbarItems, ULRToolbar
         ESC 일시정지 메뉴(ULRPauseMenuWidget), 메인화면(ULRMainMenuWidget, 감도·볼륨 슬라이더),
         적 애니메이션(ABP_LRBot), AI 근접공격(MeleeDamage=25, MeleeRange=150),
         제압 시스템(F키, 뒤 ±60도, DeathMontage).
-Day 16 완료:
-  ✅ 플레이어 근접 공격: IA_Attack(LMB) → TryAttack(), ECC_Pawn LineTrace 250 범위, 30 데미지, 0.8초 쿨다운
-  ✅ 봇 체력 시스템: MaxHealth=100, TakeDamage 오버라이드, HitReactMontage
-  ✅ 피격 시 전투 전환: NotifyHitBy() → EnterCombat() — 맞으면 즉시 추적 시작
-  ✅ QA 버그 수정: PauseMenu 반복 열기 버그(nullptr 처리), BP 이동속도 미반영(BeginPlay 재적용)
-  ⬜ 남은 작업:
-    1. 사운드 에셋 연결 (발자국, AI 보이스, 피격음, 아이템 사용음)
-    2. HitReactMontage 에셋 준비 (Mixamo → IK Retarget → AnimMontage → BP_LRBot 할당)
-    3. 시연 영상 촬영
+Day 16: 플레이어 근접 공격(IA_Attack LMB, ECC_Pawn LineTrace 250범위 30데미지 0.8초쿨다운),
+        봇 체력(MaxHealth=100, TakeDamage 오버라이드, HitReactMontage),
+        피격 시 전투 전환(NotifyHitBy → EnterCombat),
+        QA 버그 수정(PauseMenu nullptr 처리, BeginPlay 이동속도 재적용).
+Day 17 진행 중:
+  완료: HP/STA 바 UProgressBar로 교체 (PB_HP, PB_Sta, BindWidget)
+        ULRStatusComponent — GetMaxHealth(), GetMaxStamina() getter 추가
+        WBP_LRHud: 커스텀 프레임 이미지(Image_HUDFrame) 오버레이 구조
+        M_StaFill 머티리얼 생성 (UI Domain, UV 평행사변형 마스크) — 현재 미사용
+  미완료:
+    1. WBP_LRHud PB_HP / PB_Sta 위치·크기 프레임과 정렬
+    2. STA 바 프레임 이미지 직사각형 버전으로 교체
+    3. 인게임 HP/STA 감소 동작 최종 확인
+    4. 사운드 에셋 연결 (발자국, AI 보이스, 피격음, 아이템 사용음)
+    5. HitReactMontage 에셋 준비 (Mixamo → IK Retarget → AnimMontage → BP_LRBot 할당)
+    6. 시연 영상 촬영
 ```
