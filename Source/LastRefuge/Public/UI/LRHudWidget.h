@@ -4,8 +4,8 @@
 #include "Blueprint/UserWidget.h"
 #include "LRHudWidget.generated.h"
 
-class UProgressBar;
 class UTextBlock;
+class UProgressBar;
 class ULRStatusComponent;
 class ALRCharacter;
 class ULRToolbarSlotWidget;
@@ -20,16 +20,12 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
-	// --- 위젯 바인딩 ---
+	// --- 상태바 ---
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> PB_HP;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UProgressBar> PB_Stamina;
-
-	// 노이즈 바는 제거 — 3D 월드 링으로 대체
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UProgressBar> PB_Noise;
+	TObjectPtr<UProgressBar> PB_Sta;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> TB_Prompt;
@@ -54,11 +50,8 @@ private:
 	UPROPERTY()
 	TObjectPtr<ULRStatusComponent> StatusComponent;
 
-	// --- 점 애니메이션 상태 ---
 	FString ProgressBaseText;
 	bool bIsAnimating = false;
-	float DotTimer = 0.f;
-	int32 DotState = 0;
 
 	FTimerHandle CompletionHideTimer;
 	void HidePrompt();

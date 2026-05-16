@@ -26,6 +26,9 @@ public:
     float GetHealth() const { return Health; }
 
     UFUNCTION(BlueprintPure, Category = "Status")
+    float GetMaxHealth() const { return MaxHealth; }
+
+    UFUNCTION(BlueprintPure, Category = "Status")
     float GetHealthPercent() const { return Health / MaxHealth; }
     
     UFUNCTION(BlueprintCallable, Category = "LR|Status")
@@ -40,6 +43,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "Status")
     float GetStamina() const { return Stamina; }
+
+    UFUNCTION(BlueprintPure, Category = "Status")
+    float GetMaxStamina() const { return MaxStamina; }
 
     UFUNCTION(BlueprintPure, Category = "Status")
     float GetStaminaPercent() const { return Stamina / MaxStamina; }

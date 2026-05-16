@@ -22,8 +22,8 @@ void ULRHudWidget::NativeConstruct()
 		StatusComponent->OnHealthChanged.AddDynamic(this, &ULRHudWidget::OnHealthChanged);
 		StatusComponent->OnStaminaChanged.AddDynamic(this, &ULRHudWidget::OnStaminaChanged);
 
-		PB_HP->SetPercent(StatusComponent->GetHealthPercent());
-		PB_Stamina->SetPercent(StatusComponent->GetStaminaPercent());
+		OnHealthChanged(StatusComponent->GetHealth(), StatusComponent->GetMaxHealth());
+		OnStaminaChanged(StatusComponent->GetStamina(), StatusComponent->GetMaxStamina());
 	}
 
 	OwnerCharacter->OnSearchProgressChanged.AddDynamic(this, &ULRHudWidget::OnSearchProgressChanged);
@@ -51,20 +51,17 @@ void ULRHudWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	// --- 점 애니메이션 (수색중. / 수색중.. / 수색중...) ---
-	if (bIsAnimating)
+	// --- 수색 진행 시간 표시 ---
+	if (bIsAnimating && OwnerCharacter)
 	{
-		DotTimer += InDeltaTime;
-		if (DotTimer >= 0.4f)
-		{
-			DotTimer = 0.f;
-			DotState = (DotState + 1) % 3;
+		const float Current = OwnerCharacter->GetCurrentSearchTime();
+		const float Total   = OwnerCharacter->GetSearchDuration();
 
-			FString Dots;
-			for (int32 i = 0; i <= DotState; i++) Dots += TEXT(".");
+		const FString TimeText = FString::Printf(
+			TEXT("%s (%.1f / %.1f sec)"),
+			*ProgressBaseText, Current, Total);
 
-			TB_Prompt->SetText(FText::FromString(ProgressBaseText + Dots));
-		}
+		TB_Prompt->SetText(FText::FromString(TimeText));
 	}
 }
 
@@ -72,12 +69,12 @@ void ULRHudWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 
 void ULRHudWidget::OnHealthChanged(float NewHealth, float MaxHealth)
 {
-	PB_HP->SetPercent(NewHealth / MaxHealth);
+	if (PB_HP) PB_HP->SetPercent(MaxHealth > 0.f ? NewHealth / MaxHealth : 0.f);
 }
 
 void ULRHudWidget::OnStaminaChanged(float NewStamina, float MaxStamina)
 {
-	PB_Stamina->SetPercent(NewStamina / MaxStamina);
+	if (PB_Sta) PB_Sta->SetPercent(MaxStamina > 0.f ? NewStamina / MaxStamina : 0.f);
 }
 
 // --- 수색 게이지 ---
@@ -91,10 +88,8 @@ void ULRHudWidget::OnSearchStarted(FText InProgressBaseText)
 {
 	ProgressBaseText = InProgressBaseText.ToString();
 	bIsAnimating = true;
-	DotTimer = 0.f;
-	DotState = 0;
 
-	TB_Prompt->SetText(FText::FromString(ProgressBaseText + TEXT(".")));
+	TB_Prompt->SetText(FText::FromString(ProgressBaseText + TEXT(" (0.0 / 0.0 sec)")));
 	TB_Prompt->SetVisibility(ESlateVisibility::Visible);
 
 	GetWorld()->GetTimerManager().ClearTimer(CompletionHideTimer);

@@ -111,6 +111,9 @@ public:
 
     const TArray<FLRGridItem>& GetToolbarItems() const { return ToolbarItems; }
 
+    float GetCurrentSearchTime() const { return CurrentSearchTime; }
+    float GetSearchDuration()    const { return SearchDuration; }
+
     // 툴바 단축키 InputAction (에디터에서 할당)
     UPROPERTY(EditAnywhere, Category = "Input|Toolbar")
     TObjectPtr<UInputAction> IA_Toolbar1;
