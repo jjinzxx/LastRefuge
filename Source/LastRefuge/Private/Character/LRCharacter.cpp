@@ -108,6 +108,7 @@ void ALRCharacter::BeginPlay()
         PC->ResetIgnoreMoveInput();
     }
 
+    GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
     StatusComponent->OnHealthChanged.AddDynamic(this, &ALRCharacter::OnHealthChanged);
 
     // HUD 생성 (로컬 플레이어만)
@@ -164,6 +165,9 @@ void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 
         if (IA_Takedown)
             EIC->BindAction(IA_Takedown, ETriggerEvent::Started, this, &ALRCharacter::TryTakedown);
+
+        if (IA_Attack)
+            EIC->BindAction(IA_Attack, ETriggerEvent::Started, this, &ALRCharacter::TryAttack);
     }
 }
 
@@ -639,6 +643,41 @@ void ALRCharacter::TryTakedown()
     UE_LOG(LogTemp, Warning, TEXT("[Takedown] 제압 실패 — 조건 미충족"));
 }
 
+void ALRCharacter::TryAttack(const FInputActionValue& Value)
+{
+    if (!bCanAttack) return;
+    if (bInventoryOpen || bStorageOpen || bPauseMenuOpen) return;
+    if (!Controller) return;
+
+    bCanAttack = false;
+    GetWorldTimerManager().SetTimer(AttackCooldownHandle, [this]()
+    {
+        bCanAttack = true;
+    }, AttackCooldown, false);
+
+    if (SFX_Attack)
+        UGameplayStatics::PlaySoundAtLocation(this, SFX_Attack, GetActorLocation());
+
+    FVector Start;
+    FRotator Rotation;
+    Controller->GetPlayerViewPoint(Start, Rotation);
+    const FVector End = Start + Rotation.Vector() * AttackRange;
+
+    FHitResult Hit;
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+
+    FCollisionObjectQueryParams ObjParams;
+    ObjParams.AddObjectTypesToQuery(ECC_Pawn);
+    if (GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, ObjParams, Params))
+    {
+        if (ALRBot* Bot = Cast<ALRBot>(Hit.GetActor()))
+        {
+            UGameplayStatics::ApplyDamage(Bot, AttackDamage, GetController(), this, nullptr);
+        }
+    }
+}
+
 void ALRCharacter::CancelSearch()
 {
     if (bIsSearching && CurrentInteractable)
@@ -895,6 +934,7 @@ void ALRCharacter::TogglePauseMenu()
     else
     {
         PauseMenuWidget->RemoveFromParent();
+        PauseMenuWidget  = nullptr;
         PC->SetShowMouseCursor(false);
         PC->SetInputMode(FInputModeGameOnly());
         UGameplayStatics::SetGamePaused(this, false);

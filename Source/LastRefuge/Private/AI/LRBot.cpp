@@ -1,4 +1,5 @@
 #include "AI/LRBot.h"
+#include "AI/LRBotAIController.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -47,6 +48,36 @@ ALRBot::ALRBot()
 void ALRBot::BeginPlay()
 {
 	Super::BeginPlay();
+	CurrentHealth = MaxHealth;
+	GetCharacterMovement()->MaxWalkSpeed = PatrolSpeed;
+}
+
+float ALRBot::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
+	AController* EventInstigator, AActor* DamageCauser)
+{
+	if (bIsDead) return 0.f;
+
+	const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	CurrentHealth = FMath::Clamp(CurrentHealth - Applied, 0.f, MaxHealth);
+
+	UE_LOG(LogTemp, Warning, TEXT("[LRBot] TakeDamage %.0f → HP %.0f/%.0f"), Applied, CurrentHealth, MaxHealth);
+
+	if (CurrentHealth <= 0.f)
+	{
+		TakedownKill();
+	}
+	else
+	{
+		if (HitReactMontage)
+			GetMesh()->GetAnimInstance()->Montage_Play(HitReactMontage);
+
+		// 공격한 액터를 즉시 Combat 대상으로 설정
+		APawn* AttackerPawn = EventInstigator ? EventInstigator->GetPawn() : nullptr;
+		if (ALRBotAIController* AIC = Cast<ALRBotAIController>(GetController()))
+			AIC->NotifyHitBy(AttackerPawn ? AttackerPawn : DamageCauser);
+	}
+
+	return Applied;
 }
 
 FVector ALRBot::GetPatrolPointLocation(int32 Index, bool& bIsValid) const

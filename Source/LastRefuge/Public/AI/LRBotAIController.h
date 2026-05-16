@@ -22,6 +22,9 @@ public:
 	/** 플레이어 사망 시 GameMode가 호출 — Combat/Suspicious를 끊고 Patrol로 강제 복귀 */
 	void AbortToPatrol();
 
+	/** 피격 시 LRBot::TakeDamage에서 호출 — 공격자를 즉시 Combat 대상으로 설정 */
+	void NotifyHitBy(AActor* Attacker);
+
 private:
 	UFUNCTION()
 	void OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);

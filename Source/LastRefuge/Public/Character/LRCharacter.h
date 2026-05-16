@@ -148,6 +148,20 @@ public:
     UPROPERTY(EditAnywhere, Category = "Input")
     TObjectPtr<UInputAction> IA_Takedown;
 
+    // 공격 키 InputAction (에디터에서 할당, 기본 LMB)
+    UPROPERTY(EditAnywhere, Category = "Input")
+    TObjectPtr<UInputAction> IA_Attack;
+
+    // === Combat ===
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float AttackDamage = 30.f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float AttackRange = 250.f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Combat")
+    float AttackCooldown = 0.8f;
+
     // === Sound ===
     UPROPERTY(EditDefaultsOnly, Category = "Sound")
     TObjectPtr<USoundBase> SFX_Footstep_Walk;
@@ -166,6 +180,9 @@ public:
 
     UPROPERTY(EditDefaultsOnly, Category = "Sound")
     TObjectPtr<USoundBase> SFX_Death;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    TObjectPtr<USoundBase> SFX_Attack;
 
     // === UI 델리게이트 ===
     UPROPERTY(BlueprintAssignable, Category = "LR|UI")
@@ -276,6 +293,10 @@ protected:
     void TryInteract();
     void CancelSearch();
     void TryTakedown();
+    void TryAttack(const FInputActionValue& Value);
+
+    bool bCanAttack = true;
+    FTimerHandle AttackCooldownHandle;
 
     // --- 수색 게이지 상태 ---
     bool bIsSearching = false;

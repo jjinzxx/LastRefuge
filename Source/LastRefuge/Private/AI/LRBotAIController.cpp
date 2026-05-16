@@ -161,6 +161,14 @@ void ALRBotAIController::EnterPatrol()
     }
 }
 
+void ALRBotAIController::NotifyHitBy(AActor* Attacker)
+{
+	if (!Attacker || !ControlledBot || ControlledBot->bIsDead) return;
+	TrackedPlayer = Attacker;
+	ControlledBot->LastKnownLocation = Attacker->GetActorLocation();
+	EnterCombat(Attacker);
+}
+
 void ALRBotAIController::AbortToPatrol()
 {
     UE_LOG(LogTemp, Warning, TEXT("[LRBot] AbortToPatrol (player died)"));

@@ -89,6 +89,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
 	TObjectPtr<UAnimMontage> DeathMontage;
 
+	// 피격 리액션 몽타주
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
+	TObjectPtr<UAnimMontage> HitReactMontage;
+
+	// 체력
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|Combat")
+	float MaxHealth = 100.f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Combat")
+	float CurrentHealth = 100.f;
+
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent,
+		AController* EventInstigator, AActor* DamageCauser) override;
+
 	// 제압당해 사망 처리
 	void TakedownKill();
 

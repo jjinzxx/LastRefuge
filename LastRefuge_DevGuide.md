@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 16 진행 중)
+# Last Refuge - 개발 인수인계 문서 (Day 16 완료)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -38,7 +38,7 @@ Content/
     ├── UI/              # WBP_LRHud, WBP_InventoryGrid, WBP_Storage, WBP_LRItem, WBP_DragPreview
     ├── Characters/
     ├── DataAssets/      # DA_Scrap, DA_Medkit, DA_Ration (ItemID, GridWidth, GridHeight 설정 필요)
-    ├── Input/           # IMC_Default, IA_Move, IA_Look, IA_Jump, IA_Crouch, IA_Sprint, IA_Interact, IA_Inventory
+    ├── Input/           # IMC_Default, IA_Move, IA_Look, IA_Jump, IA_Crouch, IA_Sprint, IA_Interact, IA_Inventory, IA_Attack
     ├── Maps/            # L_Base, L_DangerZone, L_MainMenu
     └── AI/              # BT_LRBot, BB_LRBot
 
@@ -70,6 +70,11 @@ Source/LastRefuge/
 - **[Day 13]** `IA_Inventory` (Tab) → `ToggleInventory()`: WBP_InventoryGrid 생성/제거
 - **[Day 13]** `OpenStorageScreen(ULRInventoryGridComponent*)` / `CloseStorageScreen()`: WBP_Storage 생성/제거
 - **[Day 13]** BeginPlay에서 `GI->PersistentInventory` (FLRGridItem 배열)로 인벤 복원
+- **[Day 16]** `IA_Attack` (LMB) → `TryAttack()`: ECC_Pawn LineTrace 250 범위, 30 데미지, 0.8초 쿨다운
+- **[Day 16]** `AttackDamage / AttackRange / AttackCooldown` EditDefaultsOnly — BP에서 조정 가능
+- **[Day 16]** `SFX_Attack` 슬롯 추가
+- **[Day 16]** BeginPlay에서 `MaxWalkSpeed = WalkSpeed` 적용 — BP 이동속도 값 실제 반영
+- **[Day 16]** `TogglePauseMenu()` 닫기 시 `PauseMenuWidget = nullptr` — 재열기 시 새 인스턴스 생성으로 버튼 중복 바인딩 버그 수정
 
 ### ULRInventoryGridComponent (Components/LRInventoryGridComponent.h/.cpp) — Day 13 신규
 타르코프 스타일 10×5 그리드 인벤토리 컴포넌트.
@@ -198,6 +203,7 @@ USTRUCT() FLRSavedItem {
 | Day 13 | **타르코프 스타일 그리드 인벤토리 + 보관함 분할 UI** | ✅ 완료 |
 | Day 14 | **그리드 UI 버그 수정 + 아이템 스태킹 + 좌/우클릭 분리 + 컨텍스트 메뉴** | ✅ 완료 |
 | Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | ✅ 완료 (1인칭 손·다리 제외 — 풀바디로 멀티 시 구현 예정) |
+| Day 16 | **플레이어 공격 + 봇 체력/피격 시스템 + QA 버그 수정 + 밸런싱** | ✅ 완료 |
 
 ---
 
@@ -391,19 +397,63 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 
 ---
 
-## Day 16 — 최종 빌드 + QA + 시연 영상
+## Day 16 — 플레이어 공격 + 봇 체력/피격 + QA 버그 수정
 
 시연 영상 컷: 타이틀(0~10s) → 잠입(10~30s) → 수색+인터럽트(30~50s) → 귀환+저장(50~70s) → 보관함 컷(70~90s)
 
+### ✅ 완료 — 플레이어 근접 공격
+
+**ALRCharacter 변경:**
+- `IA_Attack` (LMB) → `TryAttack()`: `ECC_Pawn` 채널 LineTrace
+  - 범위: 250 (`AttackRange`, EditDefaultsOnly)
+  - 데미지: 30 (`AttackDamage`, EditDefaultsOnly)
+  - 쿨다운: 0.8초 (`AttackCooldown`, EditDefaultsOnly)
+  - 인벤/보관함/일시정지 열려있으면 공격 차단
+- `SFX_Attack` 슬롯 추가 (BP에서 할당)
+- `BeginPlay`에서 `MaxWalkSpeed = WalkSpeed` 적용 (BP 속도값 실제 반영)
+
+> **ECC_Visibility 대신 ECC_Pawn 사용 이유**: 캐릭터 캡슐의 기본 콜리전 프로필(`Pawn`)은 Visibility 채널을 Ignore로 설정하기 때문에 ECC_Visibility로 쏘면 봇을 통과함.
+
+**에디터 설정:**
+- `Content/LR/Input/` → `IA_Attack` (Digital bool) 생성
+- `IMC_Default`에 `IA_Attack` → **Left Mouse Button** 매핑
+- BP_LRCharacter: `IA_Attack` 할당, `SFX_Attack` 슬롯에 공격음 할당 (선택)
+
+### ✅ 완료 — 봇 체력 + 피격 시스템
+
+**ALRBot 변경:**
+- `MaxHealth = 100`, `CurrentHealth` (EditAnywhere, BP에서 조정 가능)
+- `TakeDamage` 오버라이드: HP 감소 → 0 이하면 `TakedownKill()` 호출
+- `HitReactMontage`: HP가 남아있을 때 피격 시 재생 (BP에서 할당)
+- `BeginPlay`에서 `MaxWalkSpeed = PatrolSpeed` 적용 (BP 속도값 실제 반영)
+
+**ALRBotAIController 변경:**
+- `NotifyHitBy(AActor* Attacker)` public 메서드 추가
+- 피격 시 `EnterCombat(Attacker)` 호출 → 즉시 전투 상태 전환 + 추적 시작
+
+**에디터 설정:**
+- BP_LRBot: `Hit React Montage` → `AM_Bot_HitReact` 할당 (Mixamo 리타게팅 필요)
+- BP_LRBot: `Max Health` — 기본 100, 조정 가능
+
+### ✅ 완료 — QA 버그 수정
+
+| 버그 | 원인 | 수정 |
+|---|---|---|
+| ESC 메뉴 계속하기 2회차 무반응 | `RemoveFromParent` 후 위젯 객체 잔존 → 재열기 시 `NativeConstruct` 재호출로 버튼 중복 바인딩 | 닫기 시 `PauseMenuWidget = nullptr` — 매번 새 인스턴스 생성 |
+| BP 이동속도 변경 미반영 (플레이어) | 생성자에서 C++ 기본값 고정 | `BeginPlay`에서 `MaxWalkSpeed = WalkSpeed` 재적용 |
+| BP 이동속도 변경 미반영 (봇) | 생성자에서 C++ 기본값 고정 | `BeginPlay`에서 `MaxWalkSpeed = PatrolSpeed` 재적용 |
+
 ### 밸런싱 체크
 
-| 변수 | 초기값 | 조정 방향 |
-|---|---|---|
-| AI SightRadius | 1500 | 너무 자주 들키면 -200 |
-| AI HearingRange | 2000 | Crouch 200 unit이 거의 안 들리는지 확인 |
-| Walk 소음 반경 | 600 | Walk로 안전하게 다닐 수 있는가? |
-| 수색 시간 | 3초 | 너무 길어 답답하면 2.5초 |
-| AI 사격 데미지 | 25 | 4발 = 즉사 |
+| 변수 | 기본값 | 조정 위치 | 조정 방향 |
+|---|---|---|---|
+| AI SightRadius | 1200 | BP_LRBot | 너무 자주 들키면 -200 |
+| AI HearingRange | 1800 | BP_LRBot | Crouch 이동 시 거의 안 들리는지 확인 |
+| Walk 소음 반경 | 600 | BP_LRCharacter | Walk로 안전하게 다닐 수 있는가? |
+| 수색 시간 | 3초 | BP_LRContainer | 답답하면 2.5초 |
+| AI 근접 데미지 | 25 | BP_LRBot | 플레이어 공격력과 균형 확인 |
+| 플레이어 공격 데미지 | 30 | BP_LRCharacter | 봇 HP 100 기준 4타 사망 |
+| 봇 체력 | 100 | BP_LRBot | 조정 가능 |
 
 ---
 
@@ -413,7 +463,7 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 |---|---|---|
 | AI 근접 공격 | ✅ 완료 | 거리 기반 데미지 + MeleeAttackMontage |
 | 제압 시스템 | ✅ 완료 | F키, 뒤 방향 ±60도, DeathMontage |
-| 플레이어 공격 | ⬜ 예정 | `IA_Attack` 바인딩, LineTrace 기반 데미지 |
+| 플레이어 공격 | ✅ 완료 | LMB, ECC_Pawn LineTrace 250 범위, 30 데미지, 0.8초 쿨다운 |
 | 사운드 에셋 연결 | ⬜ 예정 | 발자국·피격·AI 보이스 에셋 준비 후 BP에서 할당 |
 | 1인칭 손·다리 | ⬜ 예정 | 멀티플레이 구현 시 풀바디 방식으로 함께 처리 |
 | 손가락 리타게팅 개선 | ⬜ 알려진 문제 | QuantumCharacter 서브본 미매핑 → 손가락 부자연스러움 |
@@ -433,22 +483,24 @@ Slate가 임시로 (0,0)에 배치 → 두 번째 프레임에 커서 위치로 
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, Day 15 이어서.
+Last Refuge UE5.7 C++ 프로젝트, Day 16 완료 상태에서 이어서.
+엔진: UE 5.7.4, IDE: Rider, 접두사: LR
+
 Day 13: 타르코프 스타일 그리드 인벤토리(ULRInventoryGridComponent, 10×5, 드래그앤드롭, 회전, Shift+클릭 이동),
         보관함 분할 UI(WBP_Storage = 인벤 좌 + 창고 우).
 Day 14: 드래그 프리뷰 NativePaint 방식 교체, 아이템 스태킹(Quantity), 우클릭 1개 드래그,
         컨텍스트 메뉴(ULRContextMenuWidget, 사용하기/정보), 인벤 이미지 오정렬 버그 수정.
-Day 15 진행 중:
-  ✅ 완료:
-    - 툴바 별도 물리 공간 (TArray<FLRGridItem> ToolbarItems, ULRToolbarSlotWidget)
-      · 인벤에서 드래그→슬롯 배치, 우클릭=인벤 반환, 1~4키=즉시 사용
-      · GameInstance PersistentToolbarItems + LRSaveGame 직렬화 포함
-    - ESC 일시정지 메뉴 (ULRPauseMenuWidget: 계속하기/메인으로/종료)
-    - 메인 화면 (ULRMainMenuWidget: 시작/설정/종료, 감도·볼륨 슬라이더)
-      · L_MainMenu 전용 맵, GameMode Base (Pawn 없음)
+Day 15: 툴바 별도 물리 공간(TArray<FLRGridItem> ToolbarItems, ULRToolbarSlotWidget, 1~4키),
+        ESC 일시정지 메뉴(ULRPauseMenuWidget), 메인화면(ULRMainMenuWidget, 감도·볼륨 슬라이더),
+        적 애니메이션(ABP_LRBot), AI 근접공격(MeleeDamage=25, MeleeRange=150),
+        제압 시스템(F키, 뒤 ±60도, DeathMontage).
+Day 16 완료:
+  ✅ 플레이어 근접 공격: IA_Attack(LMB) → TryAttack(), ECC_Pawn LineTrace 250 범위, 30 데미지, 0.8초 쿨다운
+  ✅ 봇 체력 시스템: MaxHealth=100, TakeDamage 오버라이드, HitReactMontage
+  ✅ 피격 시 전투 전환: NotifyHitBy() → EnterCombat() — 맞으면 즉시 추적 시작
+  ✅ QA 버그 수정: PauseMenu 반복 열기 버그(nullptr 처리), BP 이동속도 미반영(BeginPlay 재적용)
   ⬜ 남은 작업:
-    1. 사운드 연결 (발자국, AI 보이스, 피격음, 아이템 사용음)
-    2. 적 애니메이션 (ABP_LRBot: Idle/Walk/Run/Attack)
-    3. 1인칭 손·다리 메시
-엔진: UE 5.7.4, IDE: Rider, 접두사: LR
+    1. 사운드 에셋 연결 (발자국, AI 보이스, 피격음, 아이템 사용음)
+    2. HitReactMontage 에셋 준비 (Mixamo → IK Retarget → AnimMontage → BP_LRBot 할당)
+    3. 시연 영상 촬영
 ```
