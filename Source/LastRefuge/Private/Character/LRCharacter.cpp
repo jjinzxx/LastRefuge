@@ -570,6 +570,7 @@ void ALRCharacter::TryInteract()
         CloseStorageScreen();
         return;
     }
+    if (bInventoryOpen) return;
     if (bIsSearching) return;
     if (Controller == nullptr) return;
 

@@ -50,9 +50,31 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "LR|Inventory")
 	TSubclassOf<ULRContextMenuWidget> ContextMenuWidgetClass;
 
-	// 그리드 선 색상
-	UPROPERTY(EditDefaultsOnly, Category = "LR|Inventory")
-	FLinearColor GridLineColor = FLinearColor(1.f, 1.f, 1.f, 0.15f);
+	// 단독 표시 시 배경 패널 표시 여부 (WBP_Storage 내부에서 사용할 땐 false로 설정)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LR|Style")
+	bool bShowBackground = true;
+
+	// ── 미니멀 라인아트 스타일 파라미터 ────────────────────────
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	FLinearColor GridLineColor = FLinearColor(0.75f, 0.88f, 1.0f, 0.18f);
+
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	float GridLineThickness = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	FLinearColor HoverLineColor = FLinearColor(0.88f, 0.95f, 1.0f, 0.7f);
+
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	float HoverLineThickness = 1.5f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	FLinearColor PreviewCanPlaceColor = FLinearColor(0.25f, 0.95f, 0.6f, 1.0f);
+
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	FLinearColor PreviewBlockedColor = FLinearColor(1.0f, 0.28f, 0.28f, 1.0f);
+
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	float PreviewLineThickness = 2.0f;
 
 protected:
 	virtual void NativeDestruct() override;

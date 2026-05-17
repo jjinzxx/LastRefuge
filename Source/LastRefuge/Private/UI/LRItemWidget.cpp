@@ -17,9 +17,16 @@ void ULRItemWidget::Init(const FLRGridItem& InItem, int32 InItemID,
 	TargetStorageGrid  = InTargetStorageGrid;
 	SlotSize           = InSlotSize;
 
-	// 아이콘 텍스처 적용
+	// 아이콘 텍스처 적용 — 브러시 크기를 슬롯 크기에 맞춰 고정
 	if (ItemIcon && InItem.ItemData && InItem.ItemData->ItemIcon)
-		ItemIcon->SetBrushFromTexture(InItem.ItemData->ItemIcon);
+	{
+		FSlateBrush Brush;
+		Brush.SetResourceObject(InItem.ItemData->ItemIcon);
+		Brush.ImageSize = FVector2D(
+			InItem.GetEffectiveWidth()  * InSlotSize,
+			InItem.GetEffectiveHeight() * InSlotSize);
+		ItemIcon->SetBrush(Brush);
+	}
 
 	// 수량 텍스트 — Quantity > 1일 때만 표시
 	if (QuantityText)

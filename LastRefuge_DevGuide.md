@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (Day 17 진행 중)
+# Last Refuge - 개발 인수인계 문서 (2026-05-18 진행 중)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -213,7 +213,8 @@ USTRUCT() FLRSavedItem {
 | Day 14 | **그리드 UI 버그 수정 + 아이템 스태킹 + 좌/우클릭 분리 + 컨텍스트 메뉴** | ✅ 완료 |
 | Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | ✅ 완료 (1인칭 손·다리 제외 — 풀바디로 멀티 시 구현 예정) |
 | Day 16 | **플레이어 공격 + 봇 체력/피격 시스템 + QA 버그 수정 + 밸런싱** | 완료 |
-| Day 17 | **HUD 비주얼 개선 — HP/STA 커스텀 프레임 이미지 + ProgressBar 전환** | 진행 중 |
+| Day 17 | **HUD 비주얼 개선 — HP/STA 커스텀 프레임 이미지 + ProgressBar 전환** | 완료 |
+| 2026-05-18 | **UI 전체 미니멀 라인아트 스타일 전환** | 진행 중 |
 
 ---
 
@@ -525,6 +526,59 @@ Canvas Panel
 - PB_HP / PB_Sta 크기와 위치를 Image_HUDFrame 각 칸 내부에 정확히 정렬
 - STA 바 프레임 이미지를 직사각형 버전으로 교체
 - 피격 시 HP 감소 / 달리기 시 STA 감소 인게임 동작 최종 확인
+
+---
+
+## 2026-05-18 — UI 전체 미니멀 라인아트 스타일 전환
+
+### 완료 — C++ 그리드 비주얼 라인아트화 (LRInventoryGridWidget)
+
+**NativePaint 변경:**
+- 그리드 선: 쿨블루화이트 톤, `GridLineThickness` 프로퍼티로 에디터 조절 가능
+- 호버 하이라이트: 단순 사각형 → 외곽선 + 네 모서리 L자 강조
+- 드래그 프리뷰: 반투명 채움 박스 → 외곽선 + 내부 대각선 크로스 (라인아트 전용)
+- 모든 색상/두께를 `LR|Style` 카테고리 EditDefaultsOnly로 노출 (WBP에서 실시간 조절 가능)
+
+**GridCanvas 런타임 배치:**
+- `InitGrid()` 내에서 GridCanvas CanvasPanelSlot을 `GridWidth × SlotSize`, `GridHeight × SlotSize`로 설정
+- Anchor (0.5, 0.5), Alignment (0.5, 0.5) → 화면 중앙 자동 배치
+- NativePaint Origin = `GridCanvas->GetCachedGeometry()` 실제 위치 기준으로 변경 (아이템 위치와 정합)
+
+**bShowBackground 프로퍼티:**
+- `EditAnywhere, BlueprintReadWrite` bool 추가
+- WBP_InventoryGrid: DimOverlay(전체화면), 그리드 배경 Border의 Visibility를 bShowBackground에 바인딩
+- `LRStorageWidget::InitStorage`: `PlayerInventoryWidget->bShowBackground = false` 설정 (보관함 내부 인벤 배경 미표시)
+
+### 완료 — 아이템 아이콘 크기 수정 (LRItemWidget)
+
+- `SetBrushFromTexture` → 수동 `FSlateBrush` 생성으로 변경
+- `Brush.ImageSize = FVector2D(Item.GetEffectiveWidth() * SlotSize, Item.GetEffectiveHeight() * SlotSize)` 명시 설정
+- 원본 텍스처 크기가 슬롯 크기를 무시하던 문제 해결
+
+### 완료 — 컨텍스트 메뉴 스타일 + 위치 수정 (LRContextMenuWidget)
+
+- `AddItem()`: 버튼 Normal/Hovered/Pressed 색상 C++에서 설정 (투명→호버 시 블루그레이)
+- `PositionNearMouse()`: MenuBox가 Border 안에 중첩될 경우 부모(Border)를 기준으로 위치 지정
+- `SetAutoSize(true)` 추가 → 버튼 수에 따라 배경 자동 확장
+
+### 완료 — 인벤토리 상호작용 차단 (LRCharacter)
+
+- `TryInteract()`: `bInventoryOpen` 가드 추가 → Tab 인벤 열린 상태에서 보관함/상호작용 차단
+
+### 진행 중 — Blueprint 스타일 작업
+
+| 위젯 | 상태 |
+|---|---|
+| WBP_InventoryGrid (DimOverlay, 배경) | 진행 중 |
+| WBP_Tooltip (배경, 폰트 색) | 진행 중 |
+| WBP_ContextMenu (Border 배경) | 진행 중 |
+| WBP_LRHud (HP/STA 색상, 프롬프트) | 미완료 |
+| WBP_ToolbarSlot (슬롯 배경, 텍스트) | 미완료 |
+| WBP_PauseMenu / WBP_MainMenu | 미완료 |
+
+### 알려진 이슈
+- DimOverlay(전체화면 배경) 렌더링 문제 — 조사 중
+- WBP_Storage 레이아웃 미니멀 스타일 미적용 (건너뜀)
 
 ---
 

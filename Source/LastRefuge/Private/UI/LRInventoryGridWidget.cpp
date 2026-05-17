@@ -24,6 +24,21 @@ void ULRInventoryGridWidget::InitGrid(
 
 	if (!GridComponent) return;
 
+	// GridCanvas를 그리드 실제 크기로 설정하고 화면 중앙에 배치
+	if (GridCanvas)
+	{
+		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(GridCanvas->Slot))
+		{
+			const FVector2D GridPxSize(InGridComponent->GridWidth * InSlotSize,
+			                           InGridComponent->GridHeight * InSlotSize);
+			CanvasSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
+			CanvasSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+			CanvasSlot->SetPosition(FVector2D::ZeroVector);
+			CanvasSlot->SetSize(GridPxSize);
+			CanvasSlot->SetAutoSize(false);
+		}
+	}
+
 	GridChangedHandle = GridComponent->OnGridChanged.AddUObject(
 		this, &ULRInventoryGridWidget::RebuildGrid);
 
@@ -72,8 +87,10 @@ int32 ULRInventoryGridWidget::NativePaint(
 	const int32 Cols = GridComponent->GridWidth;
 	const int32 Rows = GridComponent->GridHeight;
 
-	// GridCanvas가 Fill로 부모를 꽉 채우므로 오프셋은 항상 (0,0)
-	const FVector2D Origin = FVector2D::ZeroVector;
+	// GridCanvas의 실제 화면 위치를 기준으로 그리드 선을 그림
+	FVector2D Origin = FVector2D::ZeroVector;
+	if (GridCanvas)
+		Origin = AllottedGeometry.AbsoluteToLocal(GridCanvas->GetCachedGeometry().GetAbsolutePosition());
 
 	// ── 그리드 선 ────────────────────────────────────────
 	for (int32 Col = 0; Col <= Cols; ++Col)
@@ -82,7 +99,7 @@ int32 ULRInventoryGridWidget::NativePaint(
 		TArray<FVector2D> Pts = { FVector2D(X, Origin.Y), FVector2D(X, Origin.Y + Rows * SlotSize) };
 		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1,
 			AllottedGeometry.ToPaintGeometry(), Pts,
-			ESlateDrawEffect::None, GridLineColor, true, 1.f);
+			ESlateDrawEffect::None, GridLineColor, true, GridLineThickness);
 	}
 	for (int32 Row = 0; Row <= Rows; ++Row)
 	{
@@ -90,46 +107,64 @@ int32 ULRInventoryGridWidget::NativePaint(
 		TArray<FVector2D> Pts = { FVector2D(Origin.X, Y), FVector2D(Origin.X + Cols * SlotSize, Y) };
 		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 1,
 			AllottedGeometry.ToPaintGeometry(), Pts,
-			ESlateDrawEffect::None, GridLineColor, true, 1.f);
+			ESlateDrawEffect::None, GridLineColor, true, GridLineThickness);
 	}
 
-	// ── 호버 셀 하이라이트 ───────────────────────────────
+	// ── 호버 셀 — 외곽선만, 모서리 강조 ──────────────────
 	if (HoveredCell.X >= 0)
 	{
 		const FVector2D TL(
 			Origin.X + HoveredCell.X * SlotSize,
 			Origin.Y + HoveredCell.Y * SlotSize);
+		const FVector2D BR(TL.X + SlotSize, TL.Y + SlotSize);
 
-		TArray<FVector2D> Box = {
-			TL,
-			FVector2D(TL.X + SlotSize, TL.Y),
-			FVector2D(TL.X + SlotSize, TL.Y + SlotSize),
-			FVector2D(TL.X,            TL.Y + SlotSize),
-			TL
-		};
+		// 외곽 사각형 라인
+		TArray<FVector2D> Box = { TL, FVector2D(BR.X, TL.Y), BR, FVector2D(TL.X, BR.Y), TL };
 		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 2,
 			AllottedGeometry.ToPaintGeometry(), Box,
-			ESlateDrawEffect::None, FLinearColor(1.f, 1.f, 1.f, 0.35f), true, 2.f);
+			ESlateDrawEffect::None, HoverLineColor, true, HoverLineThickness);
+
+		// 네 모서리 강조 (라인아트 포인트)
+		const float C = SlotSize * 0.22f;
+		TArray<TArray<FVector2D>> Corners = {
+			{ TL,                              FVector2D(TL.X + C, TL.Y), FVector2D(TL.X, TL.Y + C) },
+			{ FVector2D(BR.X, TL.Y),          FVector2D(BR.X - C, TL.Y), FVector2D(BR.X, TL.Y + C) },
+			{ BR,                              FVector2D(BR.X - C, BR.Y), FVector2D(BR.X, BR.Y - C) },
+			{ FVector2D(TL.X, BR.Y),          FVector2D(TL.X + C, BR.Y), FVector2D(TL.X, BR.Y - C) },
+		};
+		for (auto& CornerPts : Corners)
+		{
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3,
+				AllottedGeometry.ToPaintGeometry(), CornerPts,
+				ESlateDrawEffect::None, HoverLineColor, true, HoverLineThickness + 1.0f);
+		}
 	}
 
-	// ── 드래그 프리뷰 ────────────────────────────────────
+	// ── 드래그 프리뷰 — 외곽선 only (라인아트) ───────────
 	if (bPreviewVisible && PreviewGridPos.X >= 0 && PreviewGridPos.Y >= 0)
 	{
-		const FLinearColor PreviewColor = bPreviewCanPlace
-			? FLinearColor(0.f, 1.f, 0.f, 0.35f)
-			: FLinearColor(1.f, 0.f, 0.f, 0.35f);
+		const FLinearColor PreviewColor = bPreviewCanPlace ? PreviewCanPlaceColor : PreviewBlockedColor;
 
 		const FVector2D TL(Origin.X + PreviewGridPos.X * SlotSize,
 		                   Origin.Y + PreviewGridPos.Y * SlotSize);
-		const FVector2D Sz(PreviewItemW * SlotSize, PreviewItemH * SlotSize);
+		const FVector2D BR(TL.X + PreviewItemW * SlotSize, TL.Y + PreviewItemH * SlotSize);
 
-		FSlateColorBrush SolidBrush(FLinearColor::White);
-		FSlateDrawElement::MakeBox(
-			OutDrawElements, LayerId + 3,
-			AllottedGeometry.ToPaintGeometry(TL, Sz),
-			&SolidBrush,
-			ESlateDrawEffect::None,
-			PreviewColor);
+		// 외곽 사각형 라인
+		TArray<FVector2D> PreviewBox = { TL, FVector2D(BR.X, TL.Y), BR, FVector2D(TL.X, BR.Y), TL };
+		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3,
+			AllottedGeometry.ToPaintGeometry(), PreviewBox,
+			ESlateDrawEffect::None, PreviewColor, true, PreviewLineThickness);
+
+		// 내부 대각선 크로스 (배치 가능 여부를 직관적으로 표시)
+		TArray<FVector2D> DiagA = { TL, BR };
+		TArray<FVector2D> DiagB = { FVector2D(BR.X, TL.Y), FVector2D(TL.X, BR.Y) };
+		const FLinearColor DiagColor = FLinearColor(PreviewColor.R, PreviewColor.G, PreviewColor.B, 0.2f);
+		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3,
+			AllottedGeometry.ToPaintGeometry(), DiagA,
+			ESlateDrawEffect::None, DiagColor, true, 1.0f);
+		FSlateDrawElement::MakeLines(OutDrawElements, LayerId + 3,
+			AllottedGeometry.ToPaintGeometry(), DiagB,
+			ESlateDrawEffect::None, DiagColor, true, 1.0f);
 	}
 
 	return Result;

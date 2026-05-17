@@ -53,14 +53,26 @@ void ULRContextMenuWidget::AddItem(const FText& Label)
 	const int32 Idx = CachedActions.Num() - 1; // 방금 추가된 액션 인덱스
 
 	UButton* Btn = NewObject<UButton>(this);
+	{
+		FButtonStyle Style = Btn->GetStyle();
+		auto MakeBrush = [](FLinearColor Color) {
+			FSlateBrush B; B.TintColor = FSlateColor(Color); B.DrawAs = ESlateBrushDrawType::Box; return B;
+		};
+		Style.Normal  = MakeBrush(FLinearColor(0.f,  0.f,  0.f,  0.f));
+		Style.Hovered = MakeBrush(FLinearColor(0.15f, 0.22f, 0.35f, 0.6f));
+		Style.Pressed = MakeBrush(FLinearColor(0.08f, 0.13f, 0.22f, 0.8f));
+		Style.SetNormalPadding(FMargin(12.f, 6.f));
+		Style.SetPressedPadding(FMargin(12.f, 7.f, 12.f, 5.f));
+		Btn->SetStyle(Style);
+	}
 
 	UTextBlock* Txt = NewObject<UTextBlock>(this);
 	Txt->SetText(Label);
 	{
 		FSlateFontInfo Font = Txt->GetFont();
-		Font.Size = 13;
+		Font.Size = 12;
 		Txt->SetFont(Font);
-		Txt->SetColorAndOpacity(FLinearColor::White);
+		Txt->SetColorAndOpacity(FLinearColor(0.80f, 0.90f, 1.0f, 1.0f));
 	}
 	Btn->AddChild(Txt);
 
@@ -75,8 +87,16 @@ void ULRContextMenuWidget::AddItem(const FText& Label)
 
 void ULRContextMenuWidget::PositionNearMouse(FVector2D ViewportPos)
 {
-	if (UCanvasPanelSlot* CS = Cast<UCanvasPanelSlot>(MenuBox->Slot))
+	// MenuBox가 Canvas Panel에 직접 있으면 MenuBox를, 아니면 부모(Border 등)를 위치시킴
+	UWidget* Target = MenuBox;
+	if (!Cast<UCanvasPanelSlot>(MenuBox->Slot) && MenuBox->GetParent())
+		Target = MenuBox->GetParent();
+
+	if (UCanvasPanelSlot* CS = Cast<UCanvasPanelSlot>(Target->Slot))
+	{
 		CS->SetPosition(ViewportPos);
+		CS->SetAutoSize(true);
+	}
 }
 
 void ULRContextMenuWidget::ExecuteAndClose(int32 Index)

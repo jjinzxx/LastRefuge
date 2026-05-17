@@ -31,6 +31,7 @@ void ULRStorageWidget::InitStorage(
 	PlayerInventoryWidget = CreateWidget<ULRInventoryGridWidget>(GetOwningPlayer(), GridWidgetClass);
 	if (PlayerInventoryWidget && InvGrid)
 	{
+		PlayerInventoryWidget->bShowBackground = false;
 		PlayerInventoryWidget->InitGrid(InvGrid, InStorageGrid, SlotSizePx);
 
 		UCanvasPanelSlot* InvSlot = InventoryContainer->AddChildToCanvas(PlayerInventoryWidget);
