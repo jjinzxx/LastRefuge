@@ -16,7 +16,6 @@ class LASTREFUGE_API ULRMainMenuWidget : public UUserWidget
 protected:
 	virtual void NativeConstruct() override;
 
-	// 메인 버튼
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> Btn_Start;
 
@@ -26,20 +25,20 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> Btn_Quit;
 
-	// 설정 패널 (숨김/표시 토글)
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidget> Panel_Settings;
 
-	// 설정 슬라이더
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<USlider> SL_Sensitivity;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<USlider> SL_Volume;
 
-	// 시작할 레벨 이름 (에디터에서 지정)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config")
 	FName StartLevelName = FName("L_Base");
+
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	FLinearColor BtnHoverColor = FLinearColor(0.15f, 0.25f, 0.38f, 0.65f);
 
 private:
 	UFUNCTION() void OnStartClicked();
@@ -47,4 +46,6 @@ private:
 	UFUNCTION() void OnQuitClicked();
 	UFUNCTION() void OnSensitivityChanged(float Value);
 	UFUNCTION() void OnVolumeChanged(float Value);
+
+	void ApplyButtonStyle(UButton* Btn) const;
 };

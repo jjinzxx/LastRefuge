@@ -13,6 +13,9 @@ Content/DetectiveOffice/
 Content/Construction/
 Content/__ExternalObjects__/
 Content/SelfStorage/
+Content/Fab/
+Content/MSPresets/
+Content/Megaplant_Library/
 
 # ============================================================
 # Unreal Engine 기본 제외 항목
