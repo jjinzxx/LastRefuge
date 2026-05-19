@@ -101,7 +101,8 @@ void ULRPauseMenuWidget::OnResumeClicked()
 
 void ULRPauseMenuWidget::OnMainMenuClicked()
 {
-	UGameplayStatics::OpenLevel(this, FName("L_MainMenu"));
+	if (ALRCharacter* Char = Cast<ALRCharacter>(GetOwningPlayerPawn()))
+		Char->SaveAndGoToMainMenu();
 }
 
 void ULRPauseMenuWidget::OnQuitClicked()

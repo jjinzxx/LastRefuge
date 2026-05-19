@@ -73,14 +73,15 @@ void ULRMainMenuWidget::ApplyButtonStyle(UButton* Btn) const
 	FSlateBrush None;
 	None.DrawAs = ESlateBrushDrawType::NoDrawType;
 
+	// 호버: 반투명 배경 채움만 (테두리 없음)
 	FSlateBrush Hover;
 	Hover.DrawAs = ESlateBrushDrawType::Box;
 	Hover.TintColor = BtnHoverColor;
 
+	// 클릭: 채움 조금 더 밝게
 	FSlateBrush Pressed;
 	Pressed.DrawAs = ESlateBrushDrawType::Box;
-	Pressed.TintColor = FLinearColor(BtnHoverColor.R * 0.55f, BtnHoverColor.G * 0.55f,
-		BtnHoverColor.B * 0.55f, 0.85f);
+	Pressed.TintColor = FLinearColor(1.0f, 1.0f, 1.0f, 0.5f);
 
 	FButtonStyle Style = Btn->GetStyle();
 	Style.SetNormal(None);

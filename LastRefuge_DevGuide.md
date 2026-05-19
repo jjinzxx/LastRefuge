@@ -214,7 +214,8 @@ USTRUCT() FLRSavedItem {
 | Day 15 | **1인칭 손/다리 + 툴바 + 적 애니메이션 + 메인화면 + ESC 메뉴 + 사운드** | ✅ 완료 (1인칭 손·다리 제외 — 풀바디로 멀티 시 구현 예정) |
 | Day 16 | **플레이어 공격 + 봇 체력/피격 시스템 + QA 버그 수정 + 밸런싱** | 완료 |
 | Day 17 | **HUD 비주얼 개선 — HP/STA 커스텀 프레임 이미지 + ProgressBar 전환** | 완료 |
-| 2026-05-18 | **UI 전체 미니멀 라인아트 스타일 전환** | 진행 중 |
+| 2026-05-18 | **UI 전체 미니멀 라인아트 스타일 전환** | 완료 |
+| 2026-05-19 | **PauseMenu/MainMenu 스타일 + 사운드 시스템 + 메인메뉴 저장 + 패키징** | 완료 |
 
 ---
 
@@ -582,10 +583,98 @@ Canvas Panel
 
 ---
 
+## 2026-05-19 — PauseMenu/MainMenu 스타일 + 사운드 시스템 + 메인메뉴 저장 + 패키징
+
+### 완료 — WBP_PauseMenu / WBP_MainMenu 라인아트 스타일
+
+**ULRPauseMenuWidget 변경:**
+- `NativePaint` 추가: 화면 중앙에 어두운 반투명 패널 + 흰 테두리 4변 + L자 모서리 강조 자동 드로우
+- 스타일 프로퍼티 (`LR|Style` 카테고리, WBP에서 실시간 조절 가능):
+  - `PanelBgColor`, `BorderColor`, `BtnHoverColor`, `PanelWidth/Height`, `BorderThickness`, `CornerSize`
+- `ApplyButtonStyle()`: Normal=투명, Hovered=반투명 채움, Pressed=더 어둡게
+
+**ULRMainMenuWidget 변경:**
+- `ApplyButtonStyle()`: Normal=투명, Hovered=반투명 흰 채움(Box 방식, 테두리 없음), Pressed=조금 더 밝게
+- `BtnHoverColor` EditDefaultsOnly 프로퍼티 추가 (기본 alpha 0.5)
+
+**에디터 설정 (공통):**
+- 버튼 내 TextBlock Color를 밝은 흰색 계열로 설정 필요 (어두운 배경과 대비)
+
+---
+
+### 완료 — 발자국 사운드 시스템 교체
+
+**변경 전:** `FootstepTimer` + `UGameplayStatics::PlaySoundAtLocation` 인터벌 방식
+
+**변경 후:** `UAudioComponent FootstepAudioComp` 기반 루프 방식
+- 이동 중: `FootstepAudioComp->Play()` — 멈추면 `Stop()` 즉시 정지
+- Walk / Run / Crouch 별 사운드 에셋 3개 → **단일 `SFX_Footstep_Walk` 에셋**으로 통합
+- 상태별 피치·볼륨 변조 (BP에서 조절 가능):
+
+| 상태 | 프로퍼티 | 기본값 |
+|---|---|---|
+| Run | `FootstepRunPitch` | 1.3 |
+| Run | `FootstepRunVolume` | 1.3 |
+| Crouch | `FootstepCrouchPitch` | 0.75 |
+| Crouch | `FootstepCrouchVolume` | 0.45 |
+
+**에디터 설정:** BP_LRCharacter → Sound → `SFX_Footstep_Walk` 에 루핑 사운드 할당 (SoundWave 루핑 체크)
+
+---
+
+### 완료 — 수색 루프음 제어 (LRContainer)
+
+- `UAudioComponent* SearchLoopAudioComp` 추가 (bAutoActivate=false)
+- `SFX_SearchLoop` 슬롯 추가
+- `BeginInteract`: `SFX_SearchStart` 단발 재생 + `SearchLoopAudioComp->Play()` 시작
+- `EndInteract`: 취소/완료 모두 `SearchLoopAudioComp->Stop()` 즉시 정지 후 `SFX_SearchComplete` 단발 재생
+
+**에디터 설정:**
+- BP_LRContainer → `SFX_SearchLoop` = 루핑 사운드 에셋 (SoundWave 루핑 체크)
+- `SFX_SearchStart`, `SFX_SearchComplete` = 단발 사운드 에셋
+
+---
+
+### 완료 — 메인메뉴 복귀 시 데이터 저장
+
+**문제:** `ULRPauseMenuWidget::OnMainMenuClicked()`이 저장 없이 바로 `OpenLevel` 호출
+
+**해결:** `ALRCharacter::SaveAndGoToMainMenu()` 추가
+- 인벤토리 → `GI->PersistentInventory`
+- 툴바 → `GI->PersistentToolbarItems`
+- 보관함 → `GI->PersistentStorageItems` + `TActorIterator<ALRStorage>`로 StorageGrid 확보
+- `ULRSaveGame::Save(InvGrid, StorageGrid, ToolbarItems, this)` 디스크 저장
+- `SetGamePaused(false)` → `OpenLevel("L_MainMenu")`
+
+`OnMainMenuClicked()` → `Char->SaveAndGoToMainMenu()` 호출로 변경
+
+---
+
+### 완료 — 패키징 설정
+
+- `Config/DefaultGame.ini`에 `MapsToCook` 3개 추가:
+  - `/Game/LR/Maps/L_MainMenu`
+  - `/Game/LR/Maps/L_Base`
+  - `/Game/LR/Maps/L_DangerZone`
+- 빌드 설정: `Build=Always`, `BuildConfiguration=Shipping`, `ForDistribution=True`
+
+### 신규 에셋 (미커밋)
+- `Content/LR/Audios/` — 오디오 에셋 폴더 신규
+- `Content/LR/Maps/L_Scavenger.umap` — 새 스캐빈저 맵
+- `Content/LR/Models/container/` — 컨테이너 모델 에셋
+
+### 미완료
+- 발자국 / 피격 / 아이템 / AI 보이스 실제 에셋 할당 (BP에서 슬롯만 비어있음)
+- WBP_LRHud HP/STA 바 프레임 정렬
+- HitReactMontage 에셋 준비 및 BP_LRBot 할당
+- 시연 영상 촬영
+
+---
+
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, Day 17 진행 중 상태에서 이어서.
+Last Refuge UE5.7 C++ 프로젝트, 2026-05-19 작업 완료 상태에서 이어서.
 엔진: UE 5.7.4, IDE: Rider, 접두사: LR
 
 Day 13: 타르코프 스타일 그리드 인벤토리(ULRInventoryGridComponent, 10×5, 드래그앤드롭, 회전, Shift+클릭 이동),
@@ -600,16 +689,20 @@ Day 16: 플레이어 근접 공격(IA_Attack LMB, ECC_Pawn LineTrace 250범위 3
         봇 체력(MaxHealth=100, TakeDamage 오버라이드, HitReactMontage),
         피격 시 전투 전환(NotifyHitBy → EnterCombat),
         QA 버그 수정(PauseMenu nullptr 처리, BeginPlay 이동속도 재적용).
-Day 17 진행 중:
-  완료: HP/STA 바 UProgressBar로 교체 (PB_HP, PB_Sta, BindWidget)
-        ULRStatusComponent — GetMaxHealth(), GetMaxStamina() getter 추가
-        WBP_LRHud: 커스텀 프레임 이미지(Image_HUDFrame) 오버레이 구조
-        M_StaFill 머티리얼 생성 (UI Domain, UV 평행사변형 마스크) — 현재 미사용
+Day 17: HP/STA 바 UProgressBar로 교체(PB_HP, PB_Sta), ULRStatusComponent GetMaxHealth/Stamina getter,
+        WBP_LRHud 커스텀 프레임 이미지(Image_HUDFrame) 오버레이 구조.
+2026-05-18: UI 전체 미니멀 라인아트 스타일 전환 (LRInventoryGridWidget NativePaint, LRContextMenuWidget 스타일).
+2026-05-19:
+  완료:
+    - WBP_PauseMenu: NativePaint 패널+테두리+L자 모서리, 버튼 라인아트 스타일
+    - WBP_MainMenu: 버튼 호버 반투명 배경 채움 스타일 (BtnHoverColor alpha 0.5)
+    - 발자국: UAudioComponent 기반 루프 방식, 단일 SFX_Footstep_Walk + 피치/볼륨 변조
+    - LRContainer: SFX_SearchLoop + UAudioComponent (취소 시 즉시 정지)
+    - ALRCharacter::SaveAndGoToMainMenu() — 메인메뉴 복귀 시 인벤/보관함/툴바 저장
+    - DefaultGame.ini MapsToCook 3개 맵 등록 (L_MainMenu, L_Base, L_DangerZone)
   미완료:
-    1. WBP_LRHud PB_HP / PB_Sta 위치·크기 프레임과 정렬
-    2. STA 바 프레임 이미지 직사각형 버전으로 교체
-    3. 인게임 HP/STA 감소 동작 최종 확인
-    4. 사운드 에셋 연결 (발자국, AI 보이스, 피격음, 아이템 사용음)
-    5. HitReactMontage 에셋 준비 (Mixamo → IK Retarget → AnimMontage → BP_LRBot 할당)
-    6. 시연 영상 촬영
+    - 발자국/피격/아이템/AI 보이스 실제 에셋 BP 슬롯 할당
+    - WBP_LRHud HP/STA 바 프레임 정렬
+    - HitReactMontage 에셋 준비 및 BP_LRBot 할당
+    - 시연 영상 촬영
 ```

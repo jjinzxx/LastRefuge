@@ -38,7 +38,7 @@ protected:
 	FName StartLevelName = FName("L_Base");
 
 	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
-	FLinearColor BtnHoverColor = FLinearColor(0.15f, 0.25f, 0.38f, 0.65f);
+	FLinearColor BtnHoverColor = FLinearColor(1.0f, 1.0f, 1.0f, 0.5f);
 
 private:
 	UFUNCTION() void OnStartClicked();

@@ -1,5 +1,6 @@
 #include "Actors/LRContainer.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/AudioComponent.h"
 #include "Character/LRCharacter.h"
 #include "Components/LRInventoryGridComponent.h"
 #include "Items/LRItemDataAsset.h"
@@ -14,6 +15,10 @@ ALRContainer::ALRContainer()
 	RootComponent = MeshComponent;
 
 	ContainerGrid = CreateDefaultSubobject<ULRInventoryGridComponent>(TEXT("ContainerGrid"));
+
+	SearchLoopAudioComp = CreateDefaultSubobject<UAudioComponent>(TEXT("SearchLoopAudio"));
+	SearchLoopAudioComp->SetupAttachment(RootComponent);
+	SearchLoopAudioComp->bAutoActivate = false;
 }
 
 void ALRContainer::BeginPlay()
@@ -68,11 +73,21 @@ void ALRContainer::BeginInteract(ALRCharacter* Player)
 	if (SFX_SearchStart)
 		UGameplayStatics::PlaySoundAtLocation(this, SFX_SearchStart, GetActorLocation());
 
+	if (SFX_SearchLoop && SearchLoopAudioComp)
+	{
+		SearchLoopAudioComp->SetSound(SFX_SearchLoop);
+		SearchLoopAudioComp->Play();
+	}
+
 	UE_LOG(LogTemp, Log, TEXT("컨테이너: 수색 시작"));
 }
 
 void ALRContainer::EndInteract(ALRCharacter* Player)
 {
+	// 취소 또는 완료 모두 루프음 즉시 정지
+	if (SearchLoopAudioComp && SearchLoopAudioComp->IsPlaying())
+		SearchLoopAudioComp->Stop();
+
 	if (Player == nullptr)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("컨테이너: 수색 취소"));
