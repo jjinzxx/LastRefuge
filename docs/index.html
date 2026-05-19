@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Last Refuge - 포스트 아포칼립스 하드코어 잠입 생존 게임. Unreal Engine 5로 제작.">
+  <meta property="og:title" content="Last Refuge">
+  <meta property="og:description" content="The last bastion of humanity. Will you make it back?">
+  <meta property="og:type" content="website">
+  <title>Last Refuge | Post-Apocalyptic Stealth Survival</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+/* ─── Custom Properties ─── */
+:root {
+  --color-bg: #0a0a08;
+  --color-bg-alt: #111109;
+  --color-bg-card: #141410;
+  --color-rust: #c8651a;
+  --color-rust-light: #e8853a;
+  --color-green-dim: #3d5a3e;
+  --color-text: #d4c8a8;
+  --color-text-dim: #8a8070;
+  --color-border: #2a2820;
+}
+
+/* ─── Reset & Base ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Source Serif 4', serif;
+  line-height: 1.7;
+}
+
+/* ─── Header ─── */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 10, 8, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.site-header.scrolled {
+  background: rgba(10, 10, 8, 0.98);
+}
+
+.nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.5rem;
+  color: var(--color-rust);
+  letter-spacing: 0.15em;
+  text-decoration: none;
+}
+
+nav a {
+  color: var(--color-text-dim);
+  text-decoration: none;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+  margin-left: 2rem;
+}
+
+nav a:hover,
+nav a.active {
+  color: var(--color-rust-light);
+}
+
+/* ─── Hero ─── */
+#hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: linear-gradient(180deg, #0a0a08 0%, #0f0e0a 60%, #1a1208 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+#hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.02) 59px, rgba(255,255,255,0.02) 60px),
+    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.02) 59px, rgba(255,255,255,0.02) 60px);
+  pointer-events: none;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  padding: 2rem;
+}
+
+.hero-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(3rem, 10vw, 8rem);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 0.05em;
+  line-height: 1;
+  margin-bottom: 1rem;
+}
+
+.hero-title span {
+  color: var(--color-rust);
+}
+
+.hero-subtitle {
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  color: var(--color-text-dim);
+  max-width: 600px;
+  margin: 0 auto 2.5rem;
+  font-style: italic;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-primary,
+.btn-secondary {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.8rem 2rem;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--color-rust);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--color-rust-light);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dim);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-text-dim);
+  color: var(--color-text);
+}
+
+/* ─── Section Common ─── */
+section {
+  padding: 5rem 2rem;
+}
+
+.section-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 700;
+  margin-bottom: 3rem;
+  color: var(--color-text);
+  letter-spacing: 0.08em;
+}
+
+.section-title::after {
+  display: block;
+  content: '';
+  width: 60px;
+  height: 3px;
+  background: var(--color-rust);
+  margin-top: 0.5rem;
+}
+
+/* ─── Features ─── */
+#features {
+  background: var(--color-bg-alt);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.feature-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  padding: 2rem;
+  transition: border-color 0.2s;
+}
+
+.feature-card:hover {
+  border-color: var(--color-rust);
+}
+
+.feature-icon {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.feature-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.2rem;
+  color: var(--color-rust-light);
+  margin-bottom: 0.5rem;
+}
+
+.feature-desc {
+  color: var(--color-text-dim);
+  font-size: 0.95rem;
+}
+
+/* ─── Gameplay ─── */
+#gameplay {
+  background: var(--color-bg);
+}
+
+.gameplay-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+}
+
+.step {
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
+.step-number {
+  font-family: 'Oswald', sans-serif;
+  font-size: 3rem;
+  color: var(--color-rust);
+  opacity: 0.4;
+  line-height: 1;
+  display: block;
+}
+
+.step-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.1rem;
+  color: var(--color-text);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0.5rem 0;
+}
+
+.step-desc {
+  color: var(--color-text-dim);
+  font-size: 0.9rem;
+}
+
+/* ─── About ─── */
+#about {
+  background: var(--color-bg-alt);
+}
+
+.about-content {
+  max-width: 700px;
+}
+
+.about-text {
+  font-size: 1.1rem;
+  color: var(--color-text-dim);
+  line-height: 1.8;
+  margin-bottom: 2rem;
+}
+
+.tech-tags {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tech-tag {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  padding: 0.4rem 1rem;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+  letter-spacing: 0.05em;
+}
+
+/* ─── Footer ─── */
+.site-footer {
+  background: #050504;
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-text-dim);
+  font-size: 0.85rem;
+}
+
+.site-footer a {
+  color: var(--color-rust);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: var(--color-rust-light);
+}
+
+/* ─── Scroll Animations ─── */
+.fade-in,
+.slide-up {
+  opacity: 0;
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.slide-up {
+  transform: translateY(30px);
+}
+
+.fade-in.visible,
+.slide-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gameplay-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .nav-inner {
+    padding: 1rem;
+  }
+
+  nav {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .gameplay-steps {
+    grid-template-columns: 1fr;
+  }
+}
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="nav-inner">
+      <div class="logo">LAST REFUGE</div>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="#gameplay">Gameplay</a>
+        <a href="#about">About</a>
+      </nav>
+    </div>
+  </header>
+
+  <section id="hero">
+    <div class="hero-content fade-in">
+      <h1 class="hero-title">LAST <span>REFUGE</span></h1>
+      <p class="hero-subtitle">The last bastion of humanity. Will you make it back?</p>
+      <div class="hero-cta">
+        <a href="#features" class="btn-primary">게임 소개</a>
+        <a href="https://github.com/LeeJinheon" class="btn-secondary" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="slide-up">
+    <div class="section-inner">
+      <h2 class="section-title">FEATURES</h2>
+      <div class="features-grid">
+        <div class="feature-card fade-in">
+          <h3 class="feature-title">잠입 시스템</h3>
+          <p class="feature-desc">소음과 스테미나를 관리하며 AI의 눈을 피해라</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3 class="feature-title">그리드 인벤토리</h3>
+          <p class="feature-desc">타르코프 스타일 10×5 그리드. 모든 아이템에는 무게가 있다</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3 class="feature-title">위협적인 AI</h3>
+          <p class="feature-desc">순찰하는 적. 탐지되는 순간 모든 것이 달라진다</p>
+        </div>
+        <div class="feature-card fade-in">
+          <h3 class="feature-title">자원 관리</h3>
+          <p class="feature-desc">희귀한 자원을 수집하고, 기지에 저장하여 생존하라</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="gameplay" class="slide-up">
+    <div class="section-inner">
+      <h2 class="section-title">GAMEPLAY LOOP</h2>
+      <div class="gameplay-steps">
+        <div class="step fade-in">
+          <span class="step-number">01</span>
+          <h3 class="step-title">DEPART</h3>
+          <p class="step-desc">안전 기지에서 출발</p>
+        </div>
+        <div class="step fade-in">
+          <span class="step-number">02</span>
+          <h3 class="step-title">INFILTRATE</h3>
+          <p class="step-desc">폐허를 탐색하며 AI를 회피</p>
+        </div>
+        <div class="step fade-in">
+          <span class="step-number">03</span>
+          <h3 class="step-title">LOOT</h3>
+          <p class="step-desc">컨테이너 수색, 자원 획득</p>
+        </div>
+        <div class="step fade-in">
+          <span class="step-number">04</span>
+          <h3 class="step-title">RETURN</h3>
+          <p class="step-desc">기지로 귀환, 자원 보관</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="about" class="slide-up">
+    <div class="section-inner">
+      <h2 class="section-title">ABOUT</h2>
+      <div class="about-content">
+        <p class="about-text">
+          Last Refuge는 포스트 아포칼립스 세계관의 1인칭 하드코어 생존 게임입니다.
+          Unreal Engine 5로 제작되었으며, 긴장감 넘치는 잠입과 자원 관리를 핵심으로 합니다.
+        </p>
+        <div class="tech-tags">
+          <span class="tech-tag">Unreal Engine 5</span>
+          <span class="tech-tag">C++</span>
+          <span class="tech-tag">1인칭 시점</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>© 2026 Last Refuge. All rights reserved.</p>
+    <a href="https://github.com/LeeJinheon" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+
+  <script>
+  // 스무스 스크롤
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+
+  // 헤더 스크롤 효과
+  const header = document.querySelector('.site-header');
+  window.addEventListener('scroll', () => {
+    header.classList.toggle('scrolled', window.scrollY > 50);
+  });
+
+  // IntersectionObserver 스크롤 애니메이션
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.fade-in, .slide-up').forEach(el => observer.observe(el));
+
+  // 현재 섹션 nav 하이라이트
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav a[href^="#"]');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(section => {
+      if (window.scrollY >= section.offsetTop - 100) current = section.id;
+    });
+    navLinks.forEach(link => {
+      link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+    });
+  });
+  </script>
+
+</body>
+</html>

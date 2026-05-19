@@ -46,5 +46,11 @@ protected:
 	TObjectPtr<USoundBase> SFX_SearchStart;
 
 	UPROPERTY(EditAnywhere, Category = "Sound")
+	TObjectPtr<USoundBase> SFX_SearchLoop;
+
+	UPROPERTY(EditAnywhere, Category = "Sound")
 	TObjectPtr<USoundBase> SFX_SearchComplete;
+
+	UPROPERTY(VisibleAnywhere, Category = "Sound")
+	TObjectPtr<UAudioComponent> SearchLoopAudioComp;
 };

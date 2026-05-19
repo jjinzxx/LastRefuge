@@ -130,6 +130,9 @@ public:
     // ESC 일시정지 메뉴 토글 (LRPauseMenuWidget에서도 호출)
     void TogglePauseMenu();
 
+    // 저장 후 메인메뉴로 이동 (PauseMenu 메인화면 버튼에서 호출)
+    void SaveAndGoToMainMenu();
+
     // === HUD ===
     UPROPERTY(EditDefaultsOnly, Category = "UI")
     TSubclassOf<ULRHudWidget> HudWidgetClass;
@@ -169,11 +172,17 @@ public:
     UPROPERTY(EditDefaultsOnly, Category = "Sound")
     TObjectPtr<USoundBase> SFX_Footstep_Walk;
 
-    UPROPERTY(EditDefaultsOnly, Category = "Sound")
-    TObjectPtr<USoundBase> SFX_Footstep_Run;
+    UPROPERTY(EditDefaultsOnly, Category = "Sound|Footstep")
+    float FootstepRunPitch = 1.3f;
 
-    UPROPERTY(EditDefaultsOnly, Category = "Sound")
-    TObjectPtr<USoundBase> SFX_Footstep_Crouch;
+    UPROPERTY(EditDefaultsOnly, Category = "Sound|Footstep")
+    float FootstepRunVolume = 1.3f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound|Footstep")
+    float FootstepCrouchPitch = 0.75f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound|Footstep")
+    float FootstepCrouchVolume = 0.45f;
 
     UPROPERTY(EditDefaultsOnly, Category = "Sound")
     TObjectPtr<USoundBase> SFX_ItemUse;
@@ -265,7 +274,8 @@ protected:
     float TargetCameraHeight = 60.f;
     float TargetCapsuleHalfHeight = 96.f;
 
-    float FootstepTimer = 0.f;
+    UPROPERTY(VisibleAnywhere, Category = "Sound")
+    TObjectPtr<UAudioComponent> FootstepAudioComp;
 
     virtual void Tick(float DeltaTime) override;
 

@@ -25,6 +25,10 @@
 #include "Items/LRItemDataAsset.h"
 #include "Interfaces/LRInteractable.h"
 #include "AI/LRBot.h"
+#include "Components/AudioComponent.h"
+#include "Actors/LRStorage.h"
+#include "EngineUtils.h"
+#include "LRSaveGame.h"
 
 ALRCharacter::ALRCharacter()
 {
@@ -58,6 +62,10 @@ ALRCharacter::ALRCharacter()
 
     InventoryGrid = CreateDefaultSubobject<ULRInventoryGridComponent>(TEXT("InventoryGrid"));
     ToolbarItems.SetNum(ToolbarSize);
+
+    FootstepAudioComp = CreateDefaultSubobject<UAudioComponent>(TEXT("FootstepAudio"));
+    FootstepAudioComp->SetupAttachment(GetRootComponent());
+    FootstepAudioComp->bAutoActivate = false;
 }
 
 void ALRCharacter::BeginPlay()
@@ -323,32 +331,33 @@ void ALRCharacter::Tick(float DeltaTime)
 
     // 발자국 사운드
     const float Speed2D = GetVelocity().Size2D();
-    if (Speed2D > 10.f)
+    if (Speed2D > 10.f && SFX_Footstep_Walk && FootstepAudioComp)
     {
-        float FootstepInterval = 0.5f;
-        USoundBase* FootstepSFX = SFX_Footstep_Walk;
+        float Pitch = 1.0f;
+        float Volume = 1.0f;
         if (MovementState == ELRMovementState::Running)
         {
-            FootstepInterval = 0.3f;
-            FootstepSFX = SFX_Footstep_Run;
+            Pitch  = FootstepRunPitch;
+            Volume = FootstepRunVolume;
         }
         else if (MovementState == ELRMovementState::Crouching)
         {
-            FootstepInterval = 0.7f;
-            FootstepSFX = SFX_Footstep_Crouch;
+            Pitch  = FootstepCrouchPitch;
+            Volume = FootstepCrouchVolume;
         }
 
-        FootstepTimer += DeltaTime;
-        if (FootstepTimer >= FootstepInterval)
-        {
-            FootstepTimer = 0.f;
-            if (FootstepSFX)
-                UGameplayStatics::PlaySoundAtLocation(this, FootstepSFX, GetActorLocation());
-        }
+        FootstepAudioComp->SetPitchMultiplier(Pitch);
+        FootstepAudioComp->SetVolumeMultiplier(Volume);
+
+        if (FootstepAudioComp->GetSound() != SFX_Footstep_Walk)
+            FootstepAudioComp->SetSound(SFX_Footstep_Walk);
+
+        if (!FootstepAudioComp->IsPlaying())
+            FootstepAudioComp->Play();
     }
-    else
+    else if (FootstepAudioComp && FootstepAudioComp->IsPlaying())
     {
-        FootstepTimer = 0.f;
+        FootstepAudioComp->Stop();
     }
 
     // 소음 보고
@@ -942,4 +951,43 @@ void ALRCharacter::TogglePauseMenu()
         bPauseMenuOpen   = false;
         bIgnoreLookInput = false;
     }
+}
+
+void ALRCharacter::SaveAndGoToMainMenu()
+{
+    ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance());
+    if (!GI) return;
+
+    // 인벤토리 → GI
+    if (ULRInventoryGridComponent* InvGrid = GetInventoryGrid())
+    {
+        GI->PersistentInventory.Empty();
+        for (const auto& [ID, Item] : InvGrid->GetItems())
+            if (!Item.IsEmpty())
+                GI->PersistentInventory.Add(Item);
+    }
+
+    // 툴바 → GI
+    GI->PersistentToolbarItems = GetToolbarItems();
+
+    // 보관함 → GI + SaveGame에 넘길 포인터 확보
+    GI->PersistentStorageItems.Empty();
+    ULRInventoryGridComponent* StorageGrid = nullptr;
+    for (TActorIterator<ALRStorage> It(GetWorld()); It; ++It)
+    {
+        StorageGrid = It->GetStorageGrid();
+        if (StorageGrid)
+            for (const auto& [ID, Item] : StorageGrid->GetItems())
+                if (!Item.IsEmpty())
+                    GI->PersistentStorageItems.Add(Item);
+        break;
+    }
+
+    GI->bHasTravelData = true;
+
+    // 디스크 저장 (인벤 + 보관함 + 툴바)
+    ULRSaveGame::Save(GetInventoryGrid(), StorageGrid, GetToolbarItems(), this);
+
+    UGameplayStatics::SetGamePaused(this, false);
+    UGameplayStatics::OpenLevel(this, FName("L_MainMenu"));
 }
