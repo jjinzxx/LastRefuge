@@ -1,8 +1,8 @@
-## Last Refuge
-
-<!-- 링크 -->
-[LastRefuge](https://jjinzxx.github.io/LastRefuge/)
+# Last Refuge
 <br>
+
+[LastRefuge Website](https://jjinzxx.github.io/LastRefuge/)
+<br><br>
 
 > 포스트 아포칼립스 하드코어 잠입 생존 게임 — Unreal Engine 5 C++ 2주 스프린트 프로젝트
 
@@ -19,9 +19,16 @@
 
 <br><br>
 
-### In-Game Preview
-
+## In-Game Preview
 > 시연 영상 및 플레이 GIF는 촬영 완료 후 이 섹션에 추가될 예정입니다.
+<!-- YouTube -->
+![영상](https://www.youtube.com/watch?v=영상ID)
+<!-- 메인메뉴 -->
+![이미지](./images/.png)
+<!-- 수색 -->
+![이미지](./images/.png)
+<!-- 전투 -->
+![이미지](./images/.png)
 
 **주요 플레이 장면 구성**
 
@@ -33,25 +40,15 @@
 | 전투 | 근접 공격(LMB) + 뒤에서 제압(F키) |
 | 귀환 | 보관함에 자원 저장 후 레벨 전환 |
 
-<!-- YouTube -->
-![영상](https://www.youtube.com/watch?v=영상ID)
 
-<!-- 메인메뉴 -->
-![이미지](./images/.png)
-<!-- 수색 -->
-![이미지](./images/.png)
-<!-- 전투 -->
-![이미지](./images/.png)
 
 <br><br>
 
-### Game Overview & Loop
-
-#### 세계관 / 시놉시스
-
+## Game Overview & Loop
+### 세계관 / 시놉시스
 문명이 붕괴한 세계. 플레이어는 마지막 안전 기지를 거점으로 삼아, 폐허가 된 도시를 탐색하며 생존 자원을 확보해야 한다. 적대적인 생존자(봇)가 배회하는 위험 구역에서 들키지 않고 물자를 수집해 기지로 귀환하는 것이 핵심이다.
 
-#### 핵심 게임 루프
+### 핵심 게임 루프
 
 <!-- 게임루프 -->
 ![이미지](./images/.png)
@@ -64,20 +61,20 @@
 
 <br><br>
 
-### Key Systems & UI
+## Key Systems & UI
 
-#### 캐릭터 / 적
+### 캐릭터 / 적
 
 | 대상 | 주요 특성 |
 |------|-----------|
 | 플레이어 (ALRCharacter) | 1인칭 카메라, 3단계 이동(웅크리기/걷기/달리기), HP 100 / STA 100, 근접 공격 + 제압 |
 | AI 봇 (ALRBot) | 3-State FSM (순찰/의심/전투), 시야 1200 + 청각 1800 범위, HP 100, 근접 공격 25 데미지 |
 
-#### 핵심 시스템
+### 핵심 시스템
 
 **이동 & 소음 (ALRCharacter / ULRStatusComponent)**
 - 자세별 이동 속도 : 웅크리기 100 / 걷기 250 / 달리기 400
-- 자세별 소음 반경 : 웅크리기 200 / 걷기 600 / 달리기 1500
+- 자세별 소음 반경 : 웅크리기 100 / 걷기 400 / 달리기 1200
 - 스테미나 소모(달리기) / 회복(정지), 소진 시 달리기 강제 중단
 - 발자국 사운드 : `UAudioComponent` 루프 방식, 자세별 피치·볼륨 변조
 
@@ -116,7 +113,7 @@
 | 플레이어 제압 | F키, 후방 ±60도, 거리 150 | 즉사 + DeathMontage |
 | 봇 근접 공격 | 거리 150 이내 자동 | 데미지 25, 인터벌 1.5초 |
 
-#### UI / UX
+### UI / UX
 
 | 위젯 | 기능 |
 |------|------|
@@ -132,15 +129,15 @@
 
 <br><br>
 
-### Team & Timeline
+## Team & Timeline
 
-#### 팀 구성
+### 팀 구성
 
 | 이름 | 역할 | GitHub |
 |------|------|--------|
 | LeeJinheon | 기획 / 프로그래밍 / UI / 아트 디렉션 (1인 개발) | [@jjinzxx](https://github.com/jjinzxx) |
 
-#### 개발 마일스톤
+### 개발 마일스톤
 
 | 기간 | 마일스톤 | 상태 |
 |------|----------|------|
@@ -152,16 +149,16 @@
 | 2026-05-14 | 그리드 인벤토리 + 보관함 분할 UI | 완료 |
 | 2026-05-15 | 드래그 프리뷰 수정, 아이템 스태킹, 컨텍스트 메뉴 | 완료 |
 | 2026-05-16 | 툴바, ESC 일시정지 메뉴, 메인화면, 적 애니메이션, 제압 시스템 | 완료 |
-| 2026-05-16 | 플레이어 공격, 봇 체력/피격, QA 버그 수정 | 완료 |
+| 2026-05-16 | 플레이어 공격, 봇 체력/피격, QA 버그 수정 | 부분완료 |
 | 2026-05-17 | HUD HP/STA 바 ProgressBar 전환, 커스텀 프레임 이미지 | 완료 |
-| 2026-05-18 | UI 전체 미니멀 라인아트 스타일 전환 | 완료 |
-| 2026-05-19 | PauseMenu/MainMenu 스타일, 사운드 시스템, 패키징 설정 | 완료 |
+| 2026-05-18 | UI 전체 미니멀 라인아트 스타일 전환 | 부분완료 |
+| 2026-05-19 | PauseMenu/MainMenu 스타일, 사운드 시스템, 패키징 설정 | 부분완료 |
 
 <br><br>
 
-### Tech Stack & Status
+## Tech Stack & Status
 
-#### 기술 스택
+### 기술 스택
 
 | 분류 | 내용 |
 |------|------|
@@ -174,9 +171,9 @@
 | Animation | AnimInstance, Blend Space 1D, AnimMontage, IK Retargeter |
 | Audio | UAudioComponent (루프), UGameplayStatics::PlaySoundAtLocation (단발) |
 | Save | UGameplaySaveGame 직렬화 |
-| Asset | DataAsset (ULRItemDataAsset), SoftObjectPath 지연 로드 |
+| Asset | PGC(Grass, Tree), Quantum Modular Character Free Sample, Shipping Container, Storage Shelf  |
 
-#### 기능 구현 현황
+### 기능 구현 현황
 
 **캐릭터 & 이동**
 - [x] 1인칭 카메라 + Enhanced Input 이동/시점/점프
@@ -223,7 +220,7 @@
 
 ### Troubleshooting & Retrospective
 
-#### 트러블 슈팅
+### 트러블 슈팅
 
 
 **[1] NativePaint 세그먼트 바 실시간 갱신 불가**
@@ -271,7 +268,7 @@
 
 <br><br>
 
-#### 느낀 점 및 개선 계획
+### 느낀 점 및 개선 계획
 
 **배운 점**
 
