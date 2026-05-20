@@ -15,6 +15,13 @@ void ULRStorageWidget::InitStorage(
 
 	constexpr float SlotSizePx = 60.f;
 
+	// Canvas Panel이 HitTestInvisible로 설정된 경우 자식 위젯 입력이 막힘.
+	// SelfHitTestInvisible = 패널 자신은 이벤트 불필요, 자식(그리드 위젯)은 정상 수신.
+	if (InventoryContainer)
+		InventoryContainer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	if (StorageContainer)
+		StorageContainer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
 	if (!InvGrid)
 	{
 		UE_LOG(LogTemp, Error, TEXT("[Storage] InvGrid(플레이어 인벤토리) null — BP_LRCharacter에서 InventoryGrid 컴포넌트 확인 필요"));
@@ -49,6 +56,7 @@ void ULRStorageWidget::InitStorage(
 	StorageGridWidget = CreateWidget<ULRInventoryGridWidget>(GetOwningPlayer(), GridWidgetClass);
 	if (StorageGridWidget)
 	{
+		StorageGridWidget->bShowBackground = false;
 		StorageGridWidget->InitGrid(InStorageGrid, InvGrid, SlotSizePx);
 
 		UCanvasPanelSlot* StgSlot = StorageContainer->AddChildToCanvas(StorageGridWidget);

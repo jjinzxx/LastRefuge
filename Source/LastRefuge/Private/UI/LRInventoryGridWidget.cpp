@@ -43,6 +43,11 @@ void ULRInventoryGridWidget::InitGrid(
 
 	// 배경은 NativePaint에서 직접 그리므로 DimOverlay 위젯 숨김
 	// → 별도 위젯 크기 동기화 없이도 배경과 선이 항상 픽셀 단위로 일치
+	// 루트 위젯의 Visibility가 HitTestInvisible로 설정된 경우
+	// NativeOnMouseButtonDown 자체가 호출되지 않아 입력 전체가 막힘.
+	// Visible로 강제 설정해 드래그·클릭 이벤트가 정상 수신되도록 보장.
+	SetVisibility(ESlateVisibility::Visible);
+
 	if (DimOverlay)
 		DimOverlay->SetVisibility(ESlateVisibility::Collapsed);
 
@@ -219,14 +224,15 @@ FReply ULRInventoryGridWidget::NativeOnMouseButtonDown(
 			if (InMouseEvent.IsShiftDown())
 			{
 				// Shift+클릭: 빠른 전송
+				// RemoveItem 이후 레퍼런스가 무효화되므로 반드시 복사본 사용
 				if (StorageGrid)
 				{
-					const FLRGridItem& Item = GridComponent->GetItems()[HitItemID];
+					const FLRGridItem ItemCopy = GridComponent->GetItems()[HitItemID];
 					int32 OutX, OutY; bool bRot;
-					if (StorageGrid->FindEmptySpace(Item, OutX, OutY, bRot))
+					if (StorageGrid->FindEmptySpace(ItemCopy, OutX, OutY, bRot))
 					{
 						GridComponent->RemoveItem(HitItemID);
-						StorageGrid->PlaceItem(OutX, OutY, Item, bRot);
+						StorageGrid->PlaceItem(OutX, OutY, ItemCopy, bRot);
 					}
 				}
 				return FReply::Handled();
@@ -325,7 +331,9 @@ void ULRInventoryGridWidget::NativeOnDragDetected(
 		DragImage->SetBrush(Brush);
 	}
 	Op->DefaultDragVisual = DragImage;
-	Op->Pivot             = EDragPivot::TopLeft;
+	// MouseDown: 클릭한 지점이 항상 커서 아래에 유지 → 드래그 이미지가 커서와 정렬
+	// TopLeft 사용 시 아이템 중심부 클릭하면 이미지가 오른쪽-아래로 밀리는 현상 발생
+	Op->Pivot             = EDragPivot::MouseDown;
 
 	PendingDragItemID = INDEX_NONE;
 	HidePreview();

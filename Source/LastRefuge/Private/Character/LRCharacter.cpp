@@ -20,7 +20,6 @@
 #include "UI/LRStorageWidget.h"
 #include "UI/LRPauseMenuWidget.h"
 #include "Blueprint/UserWidget.h"
-#include "Blueprint/WidgetLayoutLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Items/LRItemDataAsset.h"
 #include "Interfaces/LRInteractable.h"
@@ -800,18 +799,10 @@ void ALRCharacter::ToggleInventory()
         constexpr float SlotSizePx = 60.f;
         InventoryWidget->InitGrid(InventoryGrid, nullptr, SlotSizePx);
 
+        // AddToViewport → 풀스크린 오버레이로 추가.
+        // InitGrid에서 GridCanvas 앵커를 (0.5, 0.5)로 설정하므로
+        // UMG가 자동으로 화면 중앙에 배치 — 수동 DPI 계산 불필요.
         InventoryWidget->AddToViewport(5);
-        {
-            const float W = InventoryGrid->GridWidth  * 60.f;
-            const float H = InventoryGrid->GridHeight * 60.f;
-            InventoryWidget->SetDesiredSizeInViewport(FVector2D(W, H));
-
-            const float DPI = UWidgetLayoutLibrary::GetViewportScale(GetWorld());
-            FVector2D ScreenSize;
-            GEngine->GameViewport->GetViewportSize(ScreenSize);
-            InventoryWidget->SetPositionInViewport(
-                (ScreenSize / DPI - FVector2D(W, H)) * 0.5f, false);
-        }
         PC->SetShowMouseCursor(true);
         {
             FInputModeGameAndUI Mode;
