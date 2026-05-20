@@ -61,4 +61,21 @@ void ULRStorageWidget::InitStorage(
 			StgSlot->SetAutoSize(false);
 		}
 	}
+
+	// 컨테이너 패널 크기를 그리드 실제 크기에 맞게 동기화
+	// (WBP 디자이너에서 설정한 고정 크기와 C++ 계산 크기 불일치 해소)
+	auto ResizeContainer = [](UCanvasPanel* Panel, float W, float H)
+	{
+		if (!Panel) return;
+		if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(Panel->Slot))
+			S->SetSize(FVector2D(W, H));
+	};
+
+	ResizeContainer(InventoryContainer,
+		InvGrid     ? InvGrid->GridWidth      * SlotSizePx : 0.f,
+		InvGrid     ? InvGrid->GridHeight     * SlotSizePx : 0.f);
+
+	ResizeContainer(StorageContainer,
+		InStorageGrid->GridWidth  * SlotSizePx,
+		InStorageGrid->GridHeight * SlotSizePx);
 }

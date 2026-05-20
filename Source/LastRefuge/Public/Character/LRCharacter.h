@@ -292,6 +292,10 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Movement")
     float CrouchSpeed = 100.f;
 
+    /** 최대 적재 무게 (kg). 이 이상 들면 이동속도가 절반까지 감소 */
+    UPROPERTY(EditDefaultsOnly, Category = "Movement")
+    float MaxCarryWeight = 30.f;
+
     UPROPERTY(EditDefaultsOnly, Category = "Movement")
     float WalkSpeed = 250.f;
 
@@ -299,6 +303,9 @@ protected:
     float RunSpeed = 400.f;
 
     void SetMovementState(ELRMovementState NewState);
+
+    /** 현재 이동 상태 + 인벤토리 무게를 반영해 MaxWalkSpeed 재계산 */
+    void UpdateMovementSpeed();
 
     void Move(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);

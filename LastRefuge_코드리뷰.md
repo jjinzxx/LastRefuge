@@ -42,9 +42,10 @@ LastRefuge/Source/
 │   └── LRStatusComponent       ← 체력/스태미나 관리
 │
 ├── Actors/ (월드에 놓이는 오브젝트)
-│   ├── LRDoor                  ← 레벨 이동 문
+│   ├── LRDoor                  ← 레벨 이동 문 (키카드 잠금 지원)
+│   ├── LROpenableDoor          ← 경첩 기반 여닫이문 (2026-05-20 신규)
 │   ├── LRStorage               ← 보관함 (기지)
-│   └── LRContainer             ← 뒤질 수 있는 컨테이너
+│   └── LRContainer             ← 등급별 잠금/경보 컨테이너
 │
 ├── Interfaces/ (약속/계약)
 │   └── LRInteractable          ← "E키로 상호작용" 공통 규격
@@ -90,14 +91,20 @@ StatusComp->OnHealthChanged.AddDynamic(this, &ULRHudWidget::UpdateHealthBar);
 ```cpp
 // 약속 정의
 class ILRInteractable {
+    virtual bool CanInteract(ALRCharacter* Player) const { return true; }  // 기본값 true
     virtual void BeginInteract(ALRCharacter* Player) = 0;
     virtual FText GetInteractionPrompt() const = 0;
 };
 
-// 문도, 보관함도, 컨테이너도 이 약속을 지킴
-class ALRDoor : public AActor, public ILRInteractable { ... }
-class ALRStorage : public AActor, public ILRInteractable { ... }
+// 문도, 보관함도, 컨테이너도, 여닫이문도 이 약속을 지킴
+class ALRDoor        : public AActor, public ILRInteractable { ... }
+class ALROpenableDoor: public AActor, public ILRInteractable { ... }
+class ALRStorage     : public AActor, public ILRInteractable { ... }
+class ALRContainer   : public AActor, public ILRInteractable { ... }
 ```
+`CanInteract()`는 기본값 `true` — 기존 클래스를 수정하지 않아도 됨.  
+`ALRCharacter::TryInteract()`에서 false 반환 시 잠금 프롬프트를 브로드캐스트하고 조기 반환.
+
 > 비유: 플러그 규격. 220V 규격을 지키면 어떤 제품이든 콘센트에 꽂힘.
 
 <br><br>
@@ -175,7 +182,23 @@ UAISense_Hearing::ReportNoiseEvent(GetWorld(), Location, Loudness, this, Range);
 
 플레이어 주변에 **3개의 원**이 그려지는 것도 이 소음 반경을 시각화한 것입니다.
 
-### 3-6. 근접 전투 & 제압
+### 3-6. 무게 기반 이동속도 연동
+
+```cpp
+// 인벤 변경 시 자동 호출 (OnGridChanged 바인딩)
+void ALRCharacter::UpdateMovementSpeed()
+{
+    const float WeightRatio = FMath::Clamp(
+        InventoryGrid->GetTotalWeight() / MaxCarryWeight, 0.f, 1.f);
+    const float SpeedMult = FMath::Lerp(1.0f, 0.5f, WeightRatio);
+    GetCharacterMovement()->MaxWalkSpeed = BaseSpeed * SpeedMult;
+}
+```
+
+- 빈 인벤 → 100% 속도 / 만재(30kg) → 50% 속도
+- 아이템을 집거나 버릴 때 실시간으로 재계산
+
+### 3-7. 근접 전투 & 제압
 
 - **공격(LMB):** 250cm 앞까지 히트 스캔, 쿨다운 0.8초, 25 데미지
 - **제압(F키):** 봇 뒤에서만 가능, 봇 라인트레이스로 위치 검증 후 즉사 처리
@@ -347,14 +370,36 @@ E키 누름 (즉시)
 → E키 다시 누르면 닫힘
 ```
 
-### 6-3. ALRContainer — 뒤질 수 있는 컨테이너
+### 6-3. ALRContainer — 등급별 잠금/경보 컨테이너
 
 ```
 BeginPlay에서 LootTable 아이템 랜덤 배치
 E키 누름 (3초 유지)
-→ 탐색 SFX 재생
-→ 완료 → 아이템 플레이어 인벤토리로 이동
+→ [Locked] 키카드 미소지 → CanInteract() false → 잠금 프롬프트 표시
+→ [Alarmed] 수색 완료 → UAISense_Hearing::ReportNoiseEvent → AI 경보 전투 전환
+→ [Normal/Locked] 완료 → 아이템 플레이어 인벤토리로 이동
 → bSearched = true (다시 뒤질 수 없음)
+```
+
+컨테이너 등급 enum:
+```cpp
+enum class ELRContainerType : uint8 { Normal, Locked, Alarmed };
+```
+
+### 6-4. ALROpenableDoor — 경첩 기반 여닫이문
+
+레벨 이동과 무관한 인게임 여닫이문. 경첩 위치에 액터 원점을 맞춰 배치.
+
+```
+배치 방법:
+  액터 원점(오렌지 화살표) = 경첩 위치
+  HingeOffsetY = 문 폭의 절반(cm) → 메시가 Y축으로 오프셋
+  OnConstruction에서 오프셋 적용 → 에디터에서 실시간 확인 가능
+
+동작 흐름:
+  E키 → bIsOpen 토글 → TargetYaw 설정 → Tick 활성화
+  → FInterpTo로 부드러운 회전 → 0.1도 이내 도달 시 스냅 + Tick 비활성화
+  → [잠금] CanInteract(): 열린 상태면 항상 허용, 닫힌 상태면 키카드 체크
 ```
 
 <br><br>
@@ -547,9 +592,10 @@ UPROPERTY() int32 SaveVersion = 1;
 | `LRInventoryGridComponent.h/cpp` | 격자 인벤토리 전체 로직 (배치/제거/스택/저장) |
 | `LRStatusComponent.h/cpp` | 체력 & 스태미나 (소모, 회복, 델리게이트 방송) |
 | `LRItemDataAsset.h/cpp` | 아이템 설계도 (이름, 아이콘, 효과, 크기) |
-| `LRDoor.h/cpp` | 레벨 이동 + 인벤토리 직렬화 |
+| `LRDoor.h/cpp` | 레벨 이동 + 인벤토리 직렬화 + 키카드 잠금 |
+| `LROpenableDoor.h/cpp` | 경첩 기반 여닫이문 (HingeRoot, FInterpTo 회전, 키카드 잠금) |
 | `LRStorage.h/cpp` | 기지 보관함 UI 트리거 |
-| `LRContainer.h/cpp` | 탐색 가능한 루트 컨테이너 |
+| `LRContainer.h/cpp` | 등급별(Normal/Locked/Alarmed) 수색 컨테이너 |
 | `LRInteractable.h` | 상호작용 인터페이스 (E키 약속) |
 | `LRHudWidget.h/cpp` | 게임 중 HUD (체력/스태미나/도구모음/프롬프트) |
 | `LRInventoryGridWidget.h/cpp` | 격자 인벤토리 UI (커스텀 렌더링 + 드래그앤드롭) |

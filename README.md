@@ -88,6 +88,17 @@
 - 전방 LineTrace로 상호작용 대상 탐색
 - E키 유지 → 3초 게이지 채우기, 중단 시 초기화
 - 수색 중 `UAudioComponent` 루프음 재생, 완료/취소 시 단발음
+- 컨테이너 등급 : Normal / Locked(키카드 잠금) / Alarmed(수색 완료 시 AI 경보 트리거)
+
+**이동속도 무게 연동 (ALRCharacter / ULRInventoryGridComponent)**
+- `GetTotalWeight()` : 인벤 전체 `Weight × Quantity` 합산
+- `UpdateMovementSpeed()` : `Weight / MaxCarryWeight` 비율로 속도 배수 Lerp(1.0 → 0.5)
+- `OnGridChanged` 델리게이트 바인딩 → 아이템 변경 시 자동 재계산
+
+**여닫이문 (ALROpenableDoor)**
+- `USceneComponent(HingeRoot)` 기반 경첩 회전 — 액터 원점 = 경첩 위치로 배치
+- `OnConstruction`에서 메시 Y 오프셋 적용 → 에디터 실시간 확인
+- `Tick FInterpTo` 부드러운 회전 애니메이션, 선택적 키카드 잠금 지원
 
 **그리드 인벤토리 (ULRInventoryGridComponent)**
 - 10×5 그리드, 아이템 크기별 다중 셀 점유
@@ -153,6 +164,7 @@
 | 2026-05-17 | HUD HP/STA 바 ProgressBar 전환, 커스텀 프레임 이미지 | 완료 |
 | 2026-05-18 | UI 전체 미니멀 라인아트 스타일 전환 | 부분완료 |
 | 2026-05-19 | PauseMenu/MainMenu 스타일, 사운드 시스템, 패키징 설정 | 부분완료 |
+| 2026-05-20 | 컨테이너 등급/잠금, 무게 이동속도 연동, ALROpenableDoor, 그리드 배경 버그 수정 | 완료 |
 
 <br><br>
 
@@ -200,6 +212,8 @@
 - [x] 컨텍스트 메뉴 (우클릭, 사용하기/정보)
 - [x] 저장/불러오기 (ULRSaveGame 디스크 직렬화)
 - [x] GameInstance 레벨 간 영속
+- [x] 아이템 무게 → 이동속도 실시간 연동 (OnGridChanged 바인딩)
+- [x] 컨테이너 등급/잠금 (ELRContainerType, 키카드, AI 경보)
 
 **UI / 사운드**
 - [x] HUD (HP/STA 바, 수색 게이지, 상호작용 프롬프트, 툴바)
@@ -207,7 +221,7 @@
 - [x] 메인메뉴 (감도·볼륨 슬라이더)
 - [x] 미니멀 라인아트 UI 스타일
 - [x] 발자국 사운드 (UAudioComponent 루프, 자세별 피치·볼륨)
-- [ ] 수색 루프음 / 완료·취소 단발음
+- [x] 수색 루프음 / 완료·취소 단발음
 - [ ] 피격음 / 사망음 / 아이템 사용음 에셋 연결
 - [ ] 앰비언트 BGM
 
@@ -256,6 +270,15 @@
 - **원인 분석** : 언리얼 캐릭터의 기본 콜리전 프로필(`Pawn`)은 `ECC_Visibility` 채널을 `Ignore`로 설정한다. Visibility로 쏘면 봇의 캡슐 콜리더를 통과한다.
 - **해결** : LineTrace 채널을 `ECC_Visibility` → `ECC_Pawn`으로 교체.
 - **결과** : 봇 캡슐에 정상 히트, TakeDamage 호출 및 피격 즉시 전투 상태 전환.
+
+<br>
+
+**[6] 그리드 배경과 실선이 일치하지 않는 버그**
+
+- **문제** : WBP_InventoryGrid의 `DimOverlay` 위젯(배경)과 `NativePaint`로 그리는 그리드 선의 크기·위치가 항상 미세하게 어긋났다.
+- **원인 분석** : 배경 위젯과 선 렌더링이 서로 다른 시스템으로 크기를 관리했다. `BindWidgetOptional` 이름 불일치나 슬롯 타입 차이가 생기면 `DimOverlay`가 null로 처리되어 크기 동기화 자체가 무산됐다.
+- **해결** : `DimOverlay` 위젯 의존을 완전히 제거. 배경도 `NativePaint`의 `FSlateDrawElement::MakeBox`로 직접 렌더링. 배경과 선이 `Origin` · `Cols * SlotSize` 변수를 100% 공유하므로 픽셀 단위 일치 보장.
+- **결과** : WBP에서 별도 위젯 크기 동기화 없이 항상 정확히 일치. `GridBackgroundColor` UPROPERTY로 에디터에서 색상 조절 가능.
 
 <br>
 

@@ -15,6 +15,9 @@ class LASTREFUGE_API ILRInteractable
 	GENERATED_BODY()
 
 public:
+	/** 상호작용 가능 여부 검사 (false면 TryInteract에서 차단) */
+	virtual bool CanInteract(class ALRCharacter* Player) const { return true; }
+
 	/** 상호작용 시작 (E키를 눌렀을 때) */
 	virtual void BeginInteract(class ALRCharacter* Player) = 0;
     

@@ -10,7 +10,8 @@ void ULRSaveGame::Save(
 	ULRInventoryGridComponent* InvGrid,
 	ULRInventoryGridComponent* StorageGrid,
 	const TArray<FLRGridItem>& ToolbarItems,
-	UObject* WorldCtx)
+	UObject* WorldCtx,
+	const TArray<FLRGridItem>* FallbackStorageItems)
 {
 	if (!WorldCtx) return;
 
@@ -35,8 +36,32 @@ void ULRSaveGame::Save(
 		}
 	};
 
-	SerializeGrid(InvGrid,     false);
-	SerializeGrid(StorageGrid, true);
+	auto SerializeFallback = [&](const TArray<FLRGridItem>& Items)
+	{
+		for (const FLRGridItem& Item : Items)
+		{
+			if (!Item.ItemData) continue;
+			FLRSavedItem SI;
+			SI.ItemID     = Item.ItemData->ItemID;
+			SI.GridX      = Item.GridX;
+			SI.GridY      = Item.GridY;
+			SI.bIsRotated = Item.bIsRotated;
+			SI.bIsStorage = true;
+			SI.Quantity   = Item.Quantity;
+			SaveObj->SavedItems.Add(SI);
+		}
+	};
+
+	SerializeGrid(InvGrid, false);
+
+	if (StorageGrid)
+		SerializeGrid(StorageGrid, true);
+	else if (FallbackStorageItems && FallbackStorageItems->Num() > 0)
+	{
+		// 현재 맵에 창고 없음 — GI에 캐시된 창고 데이터로 대체 저장
+		SerializeFallback(*FallbackStorageItems);
+		UE_LOG(LogTemp, Log, TEXT("[SaveGame] 창고 폴백 저장: %d개"), FallbackStorageItems->Num());
+	}
 
 	// 툴바 직렬화
 	for (int32 i = 0; i < ToolbarItems.Num(); ++i)

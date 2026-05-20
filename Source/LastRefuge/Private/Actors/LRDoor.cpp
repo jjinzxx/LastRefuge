@@ -3,6 +3,7 @@
 #include "Components/LRInventoryGridComponent.h"
 #include "Actors/LRStorage.h"
 #include "LRGameInstance.h"
+#include "Items/LRItemDataAsset.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "Components/StaticMeshComponent.h"
@@ -15,6 +16,20 @@ ALRDoor::ALRDoor()
 	RootComponent = MeshComponent;
 
 	PromptText = FText::FromString(TEXT("[E] 이동하기"));
+}
+
+bool ALRDoor::CanInteract(ALRCharacter* Player) const
+{
+	if (!bRequiresKeyCard || RequiredKeyCardID.IsEmpty())
+		return true;
+
+	if (!Player) return false;
+
+	for (const auto& [ID, Item] : Player->GetInventoryGrid()->GetItems())
+		if (Item.ItemData && Item.ItemData->ItemID == RequiredKeyCardID)
+			return true;
+
+	return false;
 }
 
 void ALRDoor::BeginInteract(ALRCharacter* Player)
@@ -76,7 +91,21 @@ void ALRDoor::EndInteract(ALRCharacter* Player)
 }
 
 float ALRDoor::GetInteractionDuration() const { return InteractionDuration; }
-FText ALRDoor::GetInteractionPrompt()   const { return PromptText; }
+FText ALRDoor::GetInteractionPrompt() const
+{
+	if (bRequiresKeyCard && !RequiredKeyCardID.IsEmpty())
+	{
+		FString KeyName = RequiredKeyCardID;
+		if (const ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance()))
+		{
+			if (const TObjectPtr<ULRItemDataAsset>* Found = GI->ItemRegistry.Find(RequiredKeyCardID))
+				if (*Found)
+					KeyName = (*Found)->ItemName.ToString();
+		}
+		return FText::FromString(FString::Printf(TEXT("[E] 이동하기  🔒 %s 필요"), *KeyName));
+	}
+	return PromptText;
+}
 FText ALRDoor::GetProgressText()        const { return FText::FromString(TEXT("이동중")); }
 FText ALRDoor::GetStartText()           const { return FText::FromString(TEXT("이동 시작...")); }
 FText ALRDoor::GetCancelText()          const { return FText::FromString(TEXT("이동이 취소되었습니다.")); }

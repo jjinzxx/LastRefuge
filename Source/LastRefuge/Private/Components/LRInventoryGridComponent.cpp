@@ -14,6 +14,15 @@ void ULRInventoryGridComponent::BeginPlay()
 	Grid.Init(INDEX_NONE, GridWidth * GridHeight);
 }
 
+float ULRInventoryGridComponent::GetTotalWeight() const
+{
+	float Total = 0.f;
+	for (const auto& [ID, Item] : Items)
+		if (Item.ItemData)
+			Total += Item.ItemData->Weight * Item.Quantity;
+	return Total;
+}
+
 // ──────────────────────────────────────────────────────────────
 // CheckPlacement
 // 범위 + 겹침 검사. Grid를 읽기만 하므로 const.

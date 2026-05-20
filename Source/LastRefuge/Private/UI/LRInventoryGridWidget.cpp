@@ -25,19 +25,26 @@ void ULRInventoryGridWidget::InitGrid(
 	if (!GridComponent) return;
 
 	// GridCanvas를 그리드 실제 크기로 설정하고 화면 중앙에 배치
+	const FVector2D GridPxSize(InGridComponent->GridWidth * InSlotSize,
+	                           InGridComponent->GridHeight * InSlotSize);
+
+	// GridCanvas 크기/위치 설정
 	if (GridCanvas)
 	{
-		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(GridCanvas->Slot))
+		if (UCanvasPanelSlot* S = Cast<UCanvasPanelSlot>(GridCanvas->Slot))
 		{
-			const FVector2D GridPxSize(InGridComponent->GridWidth * InSlotSize,
-			                           InGridComponent->GridHeight * InSlotSize);
-			CanvasSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
-			CanvasSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-			CanvasSlot->SetPosition(FVector2D::ZeroVector);
-			CanvasSlot->SetSize(GridPxSize);
-			CanvasSlot->SetAutoSize(false);
+			S->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
+			S->SetAlignment(FVector2D(0.5f, 0.5f));
+			S->SetPosition(FVector2D::ZeroVector);
+			S->SetSize(GridPxSize);
+			S->SetAutoSize(false);
 		}
 	}
+
+	// 배경은 NativePaint에서 직접 그리므로 DimOverlay 위젯 숨김
+	// → 별도 위젯 크기 동기화 없이도 배경과 선이 항상 픽셀 단위로 일치
+	if (DimOverlay)
+		DimOverlay->SetVisibility(ESlateVisibility::Collapsed);
 
 	GridChangedHandle = GridComponent->OnGridChanged.AddUObject(
 		this, &ULRInventoryGridWidget::RebuildGrid);
@@ -91,6 +98,24 @@ int32 ULRInventoryGridWidget::NativePaint(
 	FVector2D Origin = FVector2D::ZeroVector;
 	if (GridCanvas)
 		Origin = AllottedGeometry.AbsoluteToLocal(GridCanvas->GetCachedGeometry().GetAbsolutePosition());
+
+	// 마우스 입력 좌표 보정에 사용 (NativeOnMouseMove / GetGridIndexFromMouse)
+	CachedGridOrigin = Origin;
+
+	// ── 그리드 배경 (NativePaint 직접 렌더링) ─────────────
+	// DimOverlay 위젯 대신 여기서 그리므로 선과 픽셀 단위 일치 보장
+	{
+		FSlateBrush BgBrush;
+		BgBrush.DrawAs = ESlateBrushDrawType::Image;
+		FSlateDrawElement::MakeBox(
+			OutDrawElements, LayerId,
+			AllottedGeometry.ToPaintGeometry(
+				FVector2D(Cols * SlotSize, Rows * SlotSize),
+				FSlateLayoutTransform(Origin)),
+			&BgBrush,
+			ESlateDrawEffect::None,
+			GridBackgroundColor);
+	}
 
 	// ── 그리드 선 ────────────────────────────────────────
 	for (int32 Col = 0; Col <= Cols; ++Col)
@@ -322,12 +347,13 @@ FReply ULRInventoryGridWidget::NativeOnMouseMove(
 {
 	if (GridComponent)
 	{
-		FVector2D LocalPx = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
-		// GridCanvas가 Fill이므로 위젯 로컬 좌표 = 그리드 좌표
+		const FVector2D LocalPx = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
+		// GridCanvas 오프셋을 빼서 그리드 내부 좌표로 변환
+		const FVector2D GridPx = LocalPx - CachedGridOrigin;
 
 		const FIntPoint Cell(
-			FMath::FloorToInt(LocalPx.X / SlotSize),
-			FMath::FloorToInt(LocalPx.Y / SlotSize));
+			FMath::FloorToInt(GridPx.X / SlotSize),
+			FMath::FloorToInt(GridPx.Y / SlotSize));
 
 		const bool bInBounds =
 			Cell.X >= 0 && Cell.X < GridComponent->GridWidth &&
@@ -396,6 +422,10 @@ void ULRInventoryGridWidget::RebuildGrid()
 	if (!GridCanvas)      { UE_LOG(LogTemp, Error, TEXT("[Grid] GridCanvas null")); return; }
 	if (!GridComponent)   { UE_LOG(LogTemp, Error, TEXT("[Grid] GridComponent null")); return; }
 	if (!ItemWidgetClass) { UE_LOG(LogTemp, Error, TEXT("[Grid] ItemWidgetClass null")); return; }
+
+	// 그리드 재빌드 시 stale 상태 초기화
+	HoveredCell     = FIntPoint(-1, -1);
+	bPreviewVisible = false;
 
 	UE_LOG(LogTemp, Warning, TEXT("[Grid] RebuildGrid — 아이템 수: %d"), GridComponent->GetItems().Num());
 
@@ -511,9 +541,11 @@ void ULRInventoryGridWidget::NativeOnDragCancelled(
 // ──────────────────────────────────────────────────────────
 FIntPoint ULRInventoryGridWidget::GetGridIndexFromMouse(FVector2D LocalPx) const
 {
+	// GridCanvas가 위젯 내에서 중앙 정렬되어 있으므로 오프셋 보정
+	const FVector2D Adjusted = LocalPx - CachedGridOrigin;
 	return FIntPoint(
-		FMath::FloorToInt(LocalPx.X / SlotSize),
-		FMath::FloorToInt(LocalPx.Y / SlotSize));
+		FMath::FloorToInt(Adjusted.X / SlotSize),
+		FMath::FloorToInt(Adjusted.Y / SlotSize));
 }
 
 FVector2D ULRInventoryGridWidget::GridToLocal(int32 GridX, int32 GridY) const

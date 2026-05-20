@@ -36,10 +36,15 @@ public:
 	UPROPERTY()
 	TArray<FLRSavedItem> SavedToolbarItems;
 
+	/**
+	 * StorageGrid가 null(현재 맵에 창고 없음)이고 FallbackStorageItems가 있으면
+	 * 그 배열을 창고 데이터로 직렬화한다 (DangerZone → GI->PersistentStorageItems 전달).
+	 */
 	static void Save(ULRInventoryGridComponent* InvGrid,
 	                 ULRInventoryGridComponent* StorageGrid,
 	                 const TArray<FLRGridItem>& ToolbarItems,
-	                 UObject* WorldCtx);
+	                 UObject* WorldCtx,
+	                 const TArray<FLRGridItem>* FallbackStorageItems = nullptr);
 
 	static void Load(ULRInventoryGridComponent* InvGrid,
 	                 ULRInventoryGridComponent* StorageGrid,

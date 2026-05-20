@@ -70,6 +70,9 @@ public:
 
 	void ClearGrid();
 
+	/** 인벤토리 전체 무게 합산 (kg) */
+	float GetTotalWeight() const;
+
 	// UI가 구독하는 변경 델리게이트
 	FOnGridChanged OnGridChanged;
 

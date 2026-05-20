@@ -40,6 +40,11 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UCanvasPanel> GridCanvas;
 
+	// 그리드 배경 오버레이 — InitGrid에서 자동으로 숨김 처리
+	// (배경은 NativePaint에서 직접 그리므로 WBP에서 삭제해도 무방)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> DimOverlay;
+
 	// BP에서 설정
 	UPROPERTY(EditDefaultsOnly, Category = "LR|Inventory")
 	TSubclassOf<ULRItemWidget> ItemWidgetClass;
@@ -55,6 +60,10 @@ public:
 	bool bShowBackground = true;
 
 	// ── 미니멀 라인아트 스타일 파라미터 ────────────────────────
+	// NativePaint에서 직접 그리는 그리드 배경색
+	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
+	FLinearColor GridBackgroundColor = FLinearColor(0.04f, 0.06f, 0.10f, 0.88f);
+
 	UPROPERTY(EditDefaultsOnly, Category = "LR|Style")
 	FLinearColor GridLineColor = FLinearColor(0.75f, 0.88f, 1.0f, 0.18f);
 
@@ -150,6 +159,10 @@ private:
 	// ── 좌표 변환 ───────────────────────────────────────
 	FIntPoint GetGridIndexFromMouse(FVector2D LocalPx) const;
 	FVector2D GridToLocal(int32 GridX, int32 GridY)   const;
+
+	// NativePaint에서 매 프레임 갱신 — GridCanvas의 위젯 내 오프셋
+	// GetGridIndexFromMouse/NativeOnMouseMove에서 입력 좌표 보정에 사용
+	mutable FVector2D CachedGridOrigin = FVector2D::ZeroVector;
 
 	// ── UI 빌드 ─────────────────────────────────────────
 	void RebuildGrid();

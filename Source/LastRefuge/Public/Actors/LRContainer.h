@@ -7,6 +7,14 @@
 
 class ULRInventoryGridComponent;
 
+UENUM(BlueprintType)
+enum class ELRContainerType : uint8
+{
+	Normal   UMETA(DisplayName = "일반"),
+	Locked   UMETA(DisplayName = "잠금 (키카드 필요)"),
+	Alarmed  UMETA(DisplayName = "경보 (수색 완료 시 AI 경보)")
+};
+
 UCLASS()
 class LASTREFUGE_API ALRContainer : public AActor, public ILRInteractable
 {
@@ -16,6 +24,7 @@ public:
 	ALRContainer();
 
 	virtual void BeginPlay() override;
+	virtual bool CanInteract(class ALRCharacter* Player) const override;
 	virtual void BeginInteract(class ALRCharacter* Player) override;
 	virtual void EndInteract(class ALRCharacter* Player) override;
 	virtual float GetInteractionDuration() const override;
@@ -38,6 +47,15 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Loot")
 	float SearchDuration = 3.0f;
+
+	// === 보안 등급 ===
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Security")
+	ELRContainerType ContainerType = ELRContainerType::Normal;
+
+	/** Locked 타입일 때 필요한 키카드 ItemID (에디터에서 설정) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Security",
+		meta = (EditCondition = "ContainerType == ELRContainerType::Locked", EditConditionHides))
+	FString RequiredKeyCardID;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Loot")
 	bool bSearched = false;

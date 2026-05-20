@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (2026-05-18 진행 중)
+# Last Refuge - 개발 인수인계 문서 (2026-05-20 진행 중)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -75,6 +75,11 @@ Source/LastRefuge/
 - **[Day 16]** `SFX_Attack` 슬롯 추가
 - **[Day 16]** BeginPlay에서 `MaxWalkSpeed = WalkSpeed` 적용 — BP 이동속도 값 실제 반영
 - **[Day 16]** `TogglePauseMenu()` 닫기 시 `PauseMenuWidget = nullptr` — 재열기 시 새 인스턴스 생성으로 버튼 중복 바인딩 버그 수정
+- **[2026-05-20]** `float MaxCarryWeight = 30.f` 추가, `void UpdateMovementSpeed()` 추가
+- **[2026-05-20]** `BeginPlay`: `InventoryGrid->OnGridChanged.AddUObject(this, &ALRCharacter::UpdateMovementSpeed)` — 인벤 변경 시 자동 속도 재계산
+- **[2026-05-20]** `UpdateMovementSpeed()`: `GetTotalWeight() / MaxCarryWeight` 비율로 Lerp(1.0 → 0.5) 속도 배수 적용, 현재 MovementState(Walk/Run/Crouch) 기준 BaseSpeed에 곱함
+- **[2026-05-20]** `SetMovementState()`: MaxWalkSpeed 직접 설정 제거 → `UpdateMovementSpeed()` 위임
+- **[2026-05-20]** `TryInteract()`: `CanInteract()` 차단 시 잠금 프롬프트 브로드캐스트 후 조기 반환
 
 ### ULRInventoryGridComponent (Components/LRInventoryGridComponent.h/.cpp) — Day 13 신규
 타르코프 스타일 10×5 그리드 인벤토리 컴포넌트.
@@ -85,12 +90,13 @@ Source/LastRefuge/
 - `FindEmptySpace(Item, OutX, OutY, bOutRotated)`: First-fit, 원본→회전 순 시도
 - `UseItem(ItemID)`: Consumable 타입이면 StatusComponent에 효과 적용
 - `FOnGridChanged OnGridChanged` 델리게이트: 데이터 변경 시 UI 자동 리빌드 트리거
+- **[2026-05-20]** `float GetTotalWeight() const`: 전체 아이템 `Weight * Quantity` 합산 반환
 
 ### 그리드 인벤토리 UI (UI/) — Day 13 신규
 
 | 클래스 | 역할 |
 |---|---|
-| `ULRInventoryGridWidget` | 그리드 전체. `UCanvasPanel* GridCanvas` (BindWidget). DragOver/Drop/Leave/Cancelled 처리. `RebuildGrid()`로 아이템 위젯 재생성 |
+| `ULRInventoryGridWidget` | 그리드 전체. `UCanvasPanel* GridCanvas` (BindWidget). DragOver/Drop/Leave/Cancelled 처리. `RebuildGrid()`로 아이템 위젯 재생성. **[2026-05-20]** NativePaint에서 배경 직접 렌더링(`GridBackgroundColor`), DimOverlay 위젯 불필요 |
 | `ULRItemWidget` | 개별 아이템 슬롯. 좌클릭=드래그, 우클릭=UseItem, Shift+좌클릭=QuickTransfer |
 | `ULRDragPreviewWidget` | 드래그 중 미리보기. 녹색(배치 가능) / 빨간색(불가) 하이라이트 |
 | `ULRItemDragDropOperation` | 드래그 데이터: `DraggedItem`, `SourceGrid`, `SourceItemID`, `GrabOffsetSlots` |
@@ -109,11 +115,12 @@ Source/LastRefuge/
 - WBP_Storage Designer: Canvas Panel 2개(`InventoryContainer`, `StorageContainer`)만 배치.
   WBP_InventoryGrid 직접 배치 금지 (C++에서 동적 생성)
 
-### ULRSaveGame (LRSaveGame.h/.cpp) — Day 13 신규, Day 15 수정
+### ULRSaveGame (LRSaveGame.h/.cpp) — Day 13 신규, Day 15·2026-05-20 수정
 - SlotName: `"LRInventorySave"`
-- `Save(InvGrid, StorageGrid, ToolbarItems, WorldCtx)`: 인벤/보관함/툴바 직렬화 → `TArray<FLRSavedItem>`
+- `Save(InvGrid, StorageGrid, ToolbarItems, WorldCtx, FallbackStorageItems)`: 인벤/보관함/툴바 직렬화 → `TArray<FLRSavedItem>`
 - `Load(InvGrid, StorageGrid, OutToolbarItems, ItemRegistry, WorldCtx)`: 그리드 초기화 후 복원. 배치 충돌 시 FindEmptySpace 폴백
 - `FLRSavedItem`에 `bool bIsToolbar = false`, `int32 ToolbarSlot = -1` 필드 추가 (Day 15)
+- **[2026-05-20]** `FallbackStorageItems` 파라미터 추가: `StorageGrid == nullptr`(DangerZone)일 때 `GI->PersistentStorageItems`를 직렬화 → DangerZone 저장 시 창고 데이터 소실 버그 수정
 
 ### FLRGridItem / FLRSavedItem (Items/LRInventoryStructs.h) — Day 13 수정
 ```cpp
@@ -142,15 +149,38 @@ USTRUCT() FLRSavedItem {
 - `TMap<FString, TObjectPtr<ULRItemDataAsset>> ItemRegistry`
 - `Init()` → `RegisterItemAssets()`: FSoftObjectPath::TryLoad()로 DataAsset 등록
 
+### ALRContainer (Actors/LRContainer.h/.cpp) — 2026-05-20 추가
+- **[2026-05-20]** `ELRContainerType` enum 추가: `Normal` / `Locked` (키카드 필요) / `Alarmed` (수색 완료 시 AI 경보)
+- **[2026-05-20]** `ContainerType` (EditAnywhere), `RequiredKeyCardID` (EditCondition: Locked일 때만 표시)
+- **[2026-05-20]** `CanInteract()`: Locked 타입이면 인벤 순회로 키카드 소지 확인. 이미 수색된 컨테이너는 항상 허용
+- **[2026-05-20]** `EndInteract()`: Alarmed 타입 완료 시 `UAISense_Hearing::ReportNoiseEvent` 호출 (AI 경보 트리거)
+- **[2026-05-20]** `GetInteractionPrompt()`: 등급별 잠금/경보 텍스트 분기
+
 ### ALRStorage (Actors/LRStorage.h/.cpp) — Day 13 수정
 - `ULRInventoryGridComponent* StorageGrid` 서브컴포넌트 추가
 - BeginPlay: `GI->PersistentStorageItems`에서 PlaceItem으로 복원
 - EndInteract: 전체 Deposit/Withdraw 방식 → `Player->OpenStorageScreen(StorageGrid)` 호출로 변경
 - 프롬프트: `[E] 보관함 열기`
 
-### ALRDoor (Actors/LRDoor.cpp) — Day 13 수정
+### ALRDoor (Actors/LRDoor.h/.cpp) — Day 13 수정, 2026-05-20 추가
 - 레벨 전환 전 인벤 저장: `GetInventoryGrid()->GetItems()` → FLRGridItem 배열
 - 보관함 저장: `StorageActor->GetStorageGrid()->GetItems()` → FLRGridItem 배열
+- **[2026-05-20]** `bool bRequiresKeyCard`, `FString RequiredKeyCardID` 추가
+- **[2026-05-20]** `CanInteract()`: 키카드 소지 확인 (인벤 순회)
+- **[2026-05-20]** `GetInteractionPrompt()`: GI `ItemRegistry`로 키카드 이름 조회 → `[E] 레벨명 이동  🔒 키카드명 필요` 표시
+
+### ALROpenableDoor (Actors/LROpenableDoor.h/.cpp) — 2026-05-20 신규
+열고닫을 수 있는 인게임 문. 레벨 전환용 ALRDoor와 별개 클래스.
+- `USceneComponent* HingeRoot` (루트): 경첩 피벗. 액터 원점 = 경첩 위치
+- `UStaticMeshComponent* MeshComponent`: HingeRoot 자식, Y축 `HingeOffsetY` 오프셋
+- `OnConstruction()`: `SetRelativeLocation(0, HingeOffsetY, 0)` — 에디터에서 실시간 확인 가능
+- `BeginPlay()`: `ClosedYaw = GetActorRotation().Yaw` 캐싱, `TargetYaw = ClosedYaw`
+- `BeginInteract()`: `bIsOpen` 토글, `TargetYaw` 설정, `SetActorTickEnabled(true)`
+- `Tick()`: `FInterpTo(Current.Yaw, TargetYaw, DeltaTime, OpenSpeed)`, 0.1도 이내 스냅 후 Tick 비활성화
+- `CanInteract()`: `bIsOpen == true`이면 항상 허용(닫기), 닫힌 상태에서만 키카드 체크
+- `GetInteractionPrompt()`: GI `ItemRegistry`로 키카드 이름 조회
+- 프로퍼티 (EditAnywhere): `HingeOffsetY=50`, `OpenAngle=90`, `OpenSpeed=3`, `bRequiresKeyCard`, `RequiredKeyCardID`
+- **에디터 배치**: 액터 오렌지 화살표(원점)를 경첩 위치에 맞춰 배치 → 메시가 Y방향으로 뻗어나감
 
 ### ULRHudWidget (UI/LRHudWidget.h/.cpp) — Day 17 수정
 - **[Day 12]** 상호작용 프롬프트 텍스트, 수색 진행 텍스트, 완료/취소 텍스트 2초 표시
@@ -195,6 +225,8 @@ USTRUCT() FLRSavedItem {
 [Root] Canvas Panel (루트)
 └── Canvas Panel  →  변수명: GridCanvas
 ```
+> DimOverlay 위젯은 삭제해도 무방. 배경은 C++ NativePaint에서 GridBackgroundColor(LR|Style)로 직접 렌더링.
+> 배경과 그리드 선이 동일한 Origin·SlotSize 변수를 공유하므로 픽셀 단위 일치 보장.
 
 ---
 
@@ -216,6 +248,7 @@ USTRUCT() FLRSavedItem {
 | Day 17 | **HUD 비주얼 개선 — HP/STA 커스텀 프레임 이미지 + ProgressBar 전환** | 완료 |
 | 2026-05-18 | **UI 전체 미니멀 라인아트 스타일 전환** | 완료 |
 | 2026-05-19 | **PauseMenu/MainMenu 스타일 + 사운드 시스템 + 메인메뉴 저장 + 패키징** | 완료 |
+| 2026-05-20 | **컨테이너 등급/잠금 + 무게 이동속도 + ALROpenableDoor + 그리드 배경 버그 수정** | 완료 |
 
 ---
 
@@ -671,10 +704,73 @@ Canvas Panel
 
 ---
 
+## 2026-05-20 — 컨테이너 등급/잠금 + 무게 이동속도 + ALROpenableDoor + 그리드 배경 버그 수정
+
+### 완료 — ILRInteractable::CanInteract() 인터페이스 확장
+
+- 기본 구현 `return true` 추가 → 기존 클래스 무수정 호환
+- `ALRCharacter::TryInteract()`: `CanInteract()` 반환 false이면 잠금 프롬프트 브로드캐스트 후 조기 반환
+
+### 완료 — 컨테이너 등급 시스템 (ELRContainerType)
+
+```cpp
+UENUM(BlueprintType)
+enum class ELRContainerType : uint8 { Normal, Locked, Alarmed };
+```
+
+| 등급 | 동작 |
+|---|---|
+| Normal | 기존과 동일 |
+| Locked | RequiredKeyCardID 키카드가 인벤에 있어야 CanInteract() 통과 |
+| Alarmed | 수색 완료 시 UAISense_Hearing::ReportNoiseEvent → AI 전투 상태 전환 |
+
+### 완료 — 아이템 무게 이동속도 연동
+
+- `ULRInventoryGridComponent::GetTotalWeight()`: 전체 아이템 `Weight × Quantity` 합산
+- `ALRCharacter::MaxCarryWeight = 30.f`, `UpdateMovementSpeed()` 추가
+- 속도 배수 = `Lerp(1.0, 0.5, Weight / MaxCarryWeight)` — 만재 시 절반 속도
+- `BeginPlay`에서 `OnGridChanged` 바인딩 → 아이템 변경마다 자동 재계산
+
+### 완료 — DangerZone 저장 버그 수정
+
+- **원인**: L_Scavenger(DangerZone)에 ALRStorage 없음 → `StorageGrid = nullptr` → 창고 직렬화 건너뜀 → GI 캐시 덮어씌워 창고 데이터 소실
+- **해결**: `ULRSaveGame::Save()` 파라미터에 `FallbackStorageItems` 추가. `StorageGrid == nullptr`이면 GI `PersistentStorageItems`를 폴백으로 직렬화
+
+### 완료 — ALRDoor 키카드 잠금
+
+- `bRequiresKeyCard`, `RequiredKeyCardID (EditConditionHides)` 프로퍼티 추가
+- `CanInteract()`: 잠금 상태이면 인벤 순회로 키카드 확인
+- `GetInteractionPrompt()`: GI `ItemRegistry`에서 키카드 이름 조회 → `[E] 이동  🔒 키카드명 필요`
+
+### 완료 — ALROpenableDoor 신규 클래스
+
+경첩 기반 여닫이문. `AActor + ILRInteractable` 상속.
+
+**배치 방법:**
+1. 레벨에 BP_LROpenableDoor 배치
+2. 액터의 오렌지 화살표(원점)를 **경첩이 될 위치**에 정확히 맞춤
+3. `HingeOffsetY` = 문 폭의 절반(cm). OnConstruction에서 메시가 Y방향으로 오프셋 → 에디터 실시간 확인 가능
+4. `OpenAngle`: 양수=왼쪽, 음수=오른쪽으로 열림
+
+### 완료 — 그리드 배경(DimOverlay) vs 실선 불일치 버그 수정
+
+- **원인**: DimOverlay 위젯과 NativePaint 선을 별도 시스템으로 관리 → BindWidgetOptional 이름 불일치·슬롯 타입 차이 등으로 항상 미세 오차 발생
+- **해결**: 배경을 NativePaint에서 `FSlateDrawElement::MakeBox`로 직접 렌더링. `Origin`·`Cols * SlotSize`를 배경과 선이 100% 공유
+- `GridBackgroundColor` UPROPERTY (EditDefaultsOnly, LR|Style) 추가 — WBP에서 조절 가능
+- WBP_InventoryGrid의 DimOverlay 위젯은 InitGrid에서 Collapsed 처리 (삭제해도 무방)
+
+### 미완료
+- 발자국 / 피격 / 아이템 / AI 보이스 실제 에셋 BP 슬롯 할당
+- WBP_LRHud HP/STA 바 프레임 정렬
+- HitReactMontage 에셋 준비 및 BP_LRBot 할당
+- 시연 영상 촬영
+
+---
+
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, 2026-05-19 작업 완료 상태에서 이어서.
+Last Refuge UE5.7 C++ 프로젝트, 2026-05-20 작업 완료 상태에서 이어서.
 엔진: UE 5.7.4, IDE: Rider, 접두사: LR
 
 Day 13: 타르코프 스타일 그리드 인벤토리(ULRInventoryGridComponent, 10×5, 드래그앤드롭, 회전, Shift+클릭 이동),
@@ -700,6 +796,16 @@ Day 17: HP/STA 바 UProgressBar로 교체(PB_HP, PB_Sta), ULRStatusComponent Get
     - LRContainer: SFX_SearchLoop + UAudioComponent (취소 시 즉시 정지)
     - ALRCharacter::SaveAndGoToMainMenu() — 메인메뉴 복귀 시 인벤/보관함/툴바 저장
     - DefaultGame.ini MapsToCook 3개 맵 등록 (L_MainMenu, L_Base, L_DangerZone)
+2026-05-20:
+  완료:
+    - ELRContainerType(Normal/Locked/Alarmed): Locked=키카드 잠금, Alarmed=수색완료 시 AI 경보
+    - ILRInteractable::CanInteract() 기본값 true, TryInteract에서 차단 처리
+    - ALRDoor 키카드 잠금(bRequiresKeyCard, RequiredKeyCardID, GI ItemRegistry 이름 조회)
+    - ALROpenableDoor 신규: HingeRoot+MeshComponent, OnConstruction Y오프셋, Tick FInterpTo 회전
+    - ULRInventoryGridComponent::GetTotalWeight(), ALRCharacter::UpdateMovementSpeed()
+      (OnGridChanged 바인딩, Weight/MaxCarryWeight Lerp 1.0→0.5)
+    - DangerZone 저장 버그: ULRSaveGame::Save() FallbackStorageItems 파라미터로 GI 캐시 폴백
+    - 그리드 배경 NativePaint 직접 렌더링(GridBackgroundColor UPROPERTY): 선과 픽셀 단위 일치
   미완료:
     - 발자국/피격/아이템/AI 보이스 실제 에셋 BP 슬롯 할당
     - WBP_LRHud HP/STA 바 프레임 정렬

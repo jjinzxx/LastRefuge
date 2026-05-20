@@ -13,6 +13,7 @@ class LASTREFUGE_API ALRDoor : public AActor, public ILRInteractable
 public:
 	ALRDoor();
 
+	virtual bool  CanInteract(class ALRCharacter* Player) const override;
 	virtual void BeginInteract(class ALRCharacter* Player) override;
 	virtual void EndInteract(class ALRCharacter* Player) override;
 	virtual float GetInteractionDuration() const override;
@@ -41,4 +42,14 @@ protected:
 	// 기지 출구 문에만 true로 설정
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Door")
 	bool bSaveStorage = false;
+
+	// === 잠금 ===
+	/** true면 RequiredKeyCardID에 해당하는 키카드가 인벤토리에 있어야 통과 가능 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lock")
+	bool bRequiresKeyCard = false;
+
+	/** bRequiresKeyCard = true일 때 필요한 키카드 ItemID */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lock",
+		meta = (EditCondition = "bRequiresKeyCard", EditConditionHides))
+	FString RequiredKeyCardID;
 };

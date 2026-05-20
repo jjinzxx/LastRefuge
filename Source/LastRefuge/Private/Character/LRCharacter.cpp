@@ -86,16 +86,37 @@ void ALRCharacter::BeginPlay()
         {
             if (GI->bHasTravelData)
             {
+                // 레벨 이동 후 GI 메모리에서 복원
                 for (const FLRGridItem& Item : GI->PersistentInventory)
-                {
                     if (!Item.IsEmpty())
                         InventoryGrid->PlaceItem(Item.GridX, Item.GridY, Item, Item.bIsRotated);
+
+                for (int32 i = 0; i < GI->PersistentToolbarItems.Num() && i < ToolbarSize; ++i)
+                    ToolbarItems[i] = GI->PersistentToolbarItems[i];
+            }
+            else
+            {
+                // 게임 최초 실행 or 재실행 — 디스크 세이브에서 복원
+                ULRInventoryGridComponent* StorageGrid = nullptr;
+                for (TActorIterator<ALRStorage> It(GetWorld()); It; ++It)
+                {
+                    StorageGrid = It->GetStorageGrid();
+                    break;
                 }
 
-                // 툴바 복원
-                for (int32 i = 0; i < GI->PersistentToolbarItems.Num() && i < ToolbarSize; ++i)
+                if (StorageGrid)
                 {
-                    ToolbarItems[i] = GI->PersistentToolbarItems[i];
+                    // TObjectPtr → raw pointer 변환
+                    TMap<FString, ULRItemDataAsset*> Registry;
+                    for (const auto& [Key, Val] : GI->ItemRegistry)
+                        Registry.Add(Key, Val.Get());
+
+                    TArray<FLRGridItem> OutToolbar;
+                    ULRSaveGame::Load(InventoryGrid, StorageGrid,
+                        OutToolbar, Registry, this);
+
+                    for (int32 i = 0; i < OutToolbar.Num() && i < ToolbarSize; ++i)
+                        ToolbarItems[i] = OutToolbar[i];
                 }
             }
         }
@@ -123,6 +144,9 @@ void ALRCharacter::BeginPlay()
 
     GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
     StatusComponent->OnHealthChanged.AddDynamic(this, &ALRCharacter::OnHealthChanged);
+
+    // 인벤토리 변경 시 무게 기반 이동속도 재계산
+    InventoryGrid->OnGridChanged.AddUObject(this, &ALRCharacter::UpdateMovementSpeed);
 
     // HUD 생성 (로컬 플레이어만)
     if (IsLocallyControlled() && HudWidgetClass)
@@ -184,6 +208,22 @@ void ALRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     }
 }
 
+void ALRCharacter::UpdateMovementSpeed()
+{
+    const float Weight      = InventoryGrid ? InventoryGrid->GetTotalWeight() : 0.f;
+    const float WeightRatio = FMath::Clamp(Weight / FMath::Max(MaxCarryWeight, 1.f), 0.f, 1.f);
+    const float SpeedMult   = FMath::Lerp(1.0f, 0.5f, WeightRatio);
+
+    float BaseSpeed;
+    switch (MovementState)
+    {
+    case ELRMovementState::Crouching: BaseSpeed = CrouchSpeed; break;
+    case ELRMovementState::Running:   BaseSpeed = RunSpeed;    break;
+    default:                          BaseSpeed = WalkSpeed;   break;
+    }
+    GetCharacterMovement()->MaxWalkSpeed = BaseSpeed * SpeedMult;
+}
+
 void ALRCharacter::SetMovementState(ELRMovementState NewState)
 {
     if (MovementState == NewState) return;
@@ -193,26 +233,25 @@ void ALRCharacter::SetMovementState(ELRMovementState NewState)
     switch (MovementState)
     {
     case ELRMovementState::Crouching:
-        GetCharacterMovement()->MaxWalkSpeed = CrouchSpeed;
         TargetCameraHeight = CrouchCameraHeight;
         TargetCapsuleHalfHeight = CrouchCapsuleHalfHeight;
         StatusComponent->UpdateNoiseRadius(StatusComponent->CrouchNoiseRadius);
         break;
 
     case ELRMovementState::Walking:
-        GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
         TargetCameraHeight = StandCameraHeight;
         TargetCapsuleHalfHeight = StandCapsuleHalfHeight;
         StatusComponent->UpdateNoiseRadius(StatusComponent->WalkNoiseRadius);
         break;
 
     case ELRMovementState::Running:
-        GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
         TargetCameraHeight = StandCameraHeight;
         TargetCapsuleHalfHeight = StandCapsuleHalfHeight;
         StatusComponent->UpdateNoiseRadius(StatusComponent->RunNoiseRadius);
         break;
     }
+
+    UpdateMovementSpeed();
 }
 
 void ALRCharacter::Move(const FInputActionValue& Value)
@@ -606,6 +645,14 @@ void ALRCharacter::TryInteract()
         ILRInteractable* InteractableTarget = Cast<ILRInteractable>(HitActor);
         if (InteractableTarget)
         {
+            // 잠금 등 접근 차단 확인
+            if (!InteractableTarget->CanInteract(this))
+            {
+                OnInteractionPromptChanged.Broadcast(
+                    FText::FromString(TEXT("잠겨 있습니다. 보안 키카드가 필요합니다.")));
+                return;
+            }
+
             CurrentInteractable = HitActor;
             SearchDuration = InteractableTarget->GetInteractionDuration();
 
@@ -992,8 +1039,9 @@ void ALRCharacter::SaveCurrentState()
 
     GI->bHasTravelData = true;
 
-    // 디스크 저장
-    ULRSaveGame::Save(GetInventoryGrid(), StorageGrid, GetToolbarItems(), this);
+    // 디스크 저장 — StorageGrid가 없는 맵(DangerZone)은 GI 캐시를 폴백으로 전달
+    ULRSaveGame::Save(GetInventoryGrid(), StorageGrid, GetToolbarItems(), this,
+        StorageGrid ? nullptr : &GI->PersistentStorageItems);
 }
 
 void ALRCharacter::SaveAndGoToMainMenu()

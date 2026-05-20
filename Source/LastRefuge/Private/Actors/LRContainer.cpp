@@ -6,6 +6,7 @@
 #include "Items/LRItemDataAsset.h"
 #include "Items/LRInventoryStructs.h"
 #include "Kismet/GameplayStatics.h"
+#include "Perception/AISense_Hearing.h"
 
 ALRContainer::ALRContainer()
 {
@@ -19,6 +20,23 @@ ALRContainer::ALRContainer()
 	SearchLoopAudioComp = CreateDefaultSubobject<UAudioComponent>(TEXT("SearchLoopAudio"));
 	SearchLoopAudioComp->SetupAttachment(RootComponent);
 	SearchLoopAudioComp->bAutoActivate = false;
+}
+
+bool ALRContainer::CanInteract(ALRCharacter* Player) const
+{
+	// 이미 수색된 컨테이너나 일반/경보 타입은 항상 접근 가능
+	if (ContainerType != ELRContainerType::Locked || bSearched)
+		return true;
+
+	if (!Player || RequiredKeyCardID.IsEmpty())
+		return false;
+
+	// 플레이어 인벤토리에서 해당 ItemID를 가진 키카드 탐색
+	for (const auto& [ID, Item] : Player->GetInventoryGrid()->GetItems())
+		if (Item.ItemData && Item.ItemData->ItemID == RequiredKeyCardID)
+			return true;
+
+	return false;
 }
 
 void ALRContainer::BeginPlay()
@@ -97,6 +115,19 @@ void ALRContainer::EndInteract(ALRCharacter* Player)
 	if (SFX_SearchComplete)
 		UGameplayStatics::PlaySoundAtLocation(this, SFX_SearchComplete, GetActorLocation());
 
+	// 경보 컨테이너: 수색 완료 시 주변 AI에 청각 자극 송출
+	if (ContainerType == ELRContainerType::Alarmed)
+	{
+		UAISense_Hearing::ReportNoiseEvent(
+			GetWorld(),
+			GetActorLocation(),
+			/*Loudness=*/ 1.0f,
+			Player,
+			/*MaxRange=*/ 0.f,   // 0 = AISense 기본 범위 사용
+			FName("Alarm"));
+		UE_LOG(LogTemp, Warning, TEXT("[Container] 경보 발동! AI에 청각 자극 송출"));
+	}
+
 	bSearched = true;
 	Player->OpenStorageScreen(ContainerGrid);
 }
@@ -109,9 +140,19 @@ float ALRContainer::GetInteractionDuration() const
 
 FText ALRContainer::GetInteractionPrompt() const
 {
-	return bSearched
-		? FText::FromString(TEXT("[E] 다시 열기"))
-		: FText::FromString(TEXT("[E] 열기"));
+	if (!bSearched)
+	{
+		switch (ContainerType)
+		{
+		case ELRContainerType::Locked:
+			return FText::FromString(TEXT("[E] 열기  🔒 보안 키카드 필요"));
+		case ELRContainerType::Alarmed:
+			return FText::FromString(TEXT("[E] 열기  ⚠ 경보 장치"));
+		default:
+			return FText::FromString(TEXT("[E] 열기"));
+		}
+	}
+	return FText::FromString(TEXT("[E] 다시 열기"));
 }
 
 FText ALRContainer::GetProgressText() const
