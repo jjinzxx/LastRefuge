@@ -26,6 +26,7 @@
 #include "Interfaces/LRInteractable.h"
 #include "AI/LRBot.h"
 #include "Components/AudioComponent.h"
+#include "Components/LineBatchComponent.h"
 #include "Actors/LRStorage.h"
 #include "EngineUtils.h"
 #include "LRSaveGame.h"
@@ -66,6 +67,10 @@ ALRCharacter::ALRCharacter()
     FootstepAudioComp = CreateDefaultSubobject<UAudioComponent>(TEXT("FootstepAudio"));
     FootstepAudioComp->SetupAttachment(GetRootComponent());
     FootstepAudioComp->bAutoActivate = false;
+
+    NoiseRingBatch = CreateDefaultSubobject<ULineBatchComponent>(TEXT("NoiseRingBatch"));
+    NoiseRingBatch->SetupAttachment(GetRootComponent());
+    NoiseRingBatch->bCalculateAccurateBounds = false;
 }
 
 void ALRCharacter::BeginPlay()
@@ -396,36 +401,38 @@ void ALRCharacter::Tick(float DeltaTime)
 
         // 2. 소음 반경이 있고 + 캐릭터가 일정 속도 이상으로 움직일 때만 실행
         // Speed > 10.f 는 완전히 멈춰있지 않을 때를 의미합니다.
+        // 매 프레임 이전 선 지우기
+        NoiseRingBatch->Flush();
+
         if (NoisePercent > 0.01f && CurrentSpeed > 10.f)
         {
             const FVector GroundPos = GetActorLocation() -
                 FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - 2.f);
 
             const float Speed = NoiseRingCycleSpeed * NoisePercent;
+            constexpr int32 Segments = 40;
+            constexpr float AngleStep = 2.f * PI / Segments;
 
             for (int32 i = 0; i < 3; i++)
             {
                 NoiseRingPhase[i] = FMath::Fmod(NoiseRingPhase[i] + Speed * DeltaTime, 1.f);
-                const float t = NoiseRingPhase[i];
+                const float t     = NoiseRingPhase[i];
+                const float Radius    = FMath::Lerp(30.f, NoiseRadius, t);
+                const float Thickness = FMath::Lerp(2.0f, 0.0f, t);
+                const FLinearColor Color(1.f, 1.f, 1.f, FMath::Lerp(1.f, 0.f, t));
 
-                const float Radius = FMath::Lerp(30.f, NoiseRadius, t);
-            
-                // 흰색 고정 (멀어질수록 선 두께를 얇게 해서 자연스럽게 제거)
-                const float CurrentThickness = FMath::Lerp(2.0f, 0.0f, t);
-
-                DrawDebugCircle(
-                    GetWorld(), GroundPos, Radius,
-                    40, FColor::White,
-                    false, -1.f, 0, CurrentThickness,
-                    FVector::ForwardVector, FVector::RightVector,
-                    false
-                );
+                FVector Prev = GroundPos + FVector(Radius, 0.f, 2.f);
+                for (int32 s = 1; s <= Segments; ++s)
+                {
+                    const float Angle = s * AngleStep;
+                    FVector Next = GroundPos + FVector(
+                        FMath::Cos(Angle) * Radius,
+                        FMath::Sin(Angle) * Radius,
+                        2.f);
+                    NoiseRingBatch->DrawLine(Prev, Next, Color, 0, Thickness, 0.f);
+                    Prev = Next;
+                }
             }
-        }
-        else
-        {
-            // 움직임이 멈췄을 때 링의 애니메이션 단계를 초기화하고 싶다면 여기서 처리 가능
-            // for (int32 i = 0; i < 3; i++) { NoiseRingPhase[i] = 0.f; }
         }
     }
 
@@ -953,7 +960,7 @@ void ALRCharacter::TogglePauseMenu()
     }
 }
 
-void ALRCharacter::SaveAndGoToMainMenu()
+void ALRCharacter::SaveCurrentState()
 {
     ULRGameInstance* GI = Cast<ULRGameInstance>(GetGameInstance());
     if (!GI) return;
@@ -985,9 +992,13 @@ void ALRCharacter::SaveAndGoToMainMenu()
 
     GI->bHasTravelData = true;
 
-    // 디스크 저장 (인벤 + 보관함 + 툴바)
+    // 디스크 저장
     ULRSaveGame::Save(GetInventoryGrid(), StorageGrid, GetToolbarItems(), this);
+}
 
+void ALRCharacter::SaveAndGoToMainMenu()
+{
+    SaveCurrentState();
     UGameplayStatics::SetGamePaused(this, false);
     UGameplayStatics::OpenLevel(this, FName("L_MainMenu"));
 }

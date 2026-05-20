@@ -107,5 +107,8 @@ void ULRPauseMenuWidget::OnMainMenuClicked()
 
 void ULRPauseMenuWidget::OnQuitClicked()
 {
+	if (ALRCharacter* Char = Cast<ALRCharacter>(GetOwningPlayerPawn()))
+		Char->SaveCurrentState();
+
 	UKismetSystemLibrary::QuitGame(this, GetOwningPlayer(), EQuitPreference::Quit, false);
 }

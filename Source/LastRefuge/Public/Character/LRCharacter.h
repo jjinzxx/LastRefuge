@@ -130,6 +130,9 @@ public:
     // ESC 일시정지 메뉴 토글 (LRPauseMenuWidget에서도 호출)
     void TogglePauseMenu();
 
+    // 인벤/보관함/툴바 현재 상태를 GI + 디스크에 저장
+    void SaveCurrentState();
+
     // 저장 후 메인메뉴로 이동 (PauseMenu 메인화면 버튼에서 호출)
     void SaveAndGoToMainMenu();
 
@@ -276,6 +279,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category = "Sound")
     TObjectPtr<UAudioComponent> FootstepAudioComp;
+
+    UPROPERTY(VisibleAnywhere, Category = "Debug")
+    TObjectPtr<ULineBatchComponent> NoiseRingBatch;
 
     virtual void Tick(float DeltaTime) override;
 
