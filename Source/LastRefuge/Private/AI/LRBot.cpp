@@ -69,7 +69,8 @@ float ALRBot::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 	else
 	{
 		if (HitReactMontage)
-			GetMesh()->GetAnimInstance()->Montage_Play(HitReactMontage);
+			if (UAnimInstance* Anim = GetMesh()->GetAnimInstance())
+				Anim->Montage_Play(HitReactMontage);
 
 		// 공격한 액터를 즉시 Combat 대상으로 설정
 		APawn* AttackerPawn = EventInstigator ? EventInstigator->GetPawn() : nullptr;
@@ -110,7 +111,8 @@ void ALRBot::TakedownKill()
 	bIsDead = true;
 
 	if (DeathMontage)
-		GetMesh()->GetAnimInstance()->Montage_Play(DeathMontage);
+		if (UAnimInstance* Anim = GetMesh()->GetAnimInstance())
+			Anim->Montage_Play(DeathMontage);
 
 	// 충돌/AI 비활성화
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);

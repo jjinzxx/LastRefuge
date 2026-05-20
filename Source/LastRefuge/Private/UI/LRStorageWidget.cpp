@@ -17,10 +17,8 @@ void ULRStorageWidget::InitStorage(
 
 	// Canvas Panel이 HitTestInvisible로 설정된 경우 자식 위젯 입력이 막힘.
 	// SelfHitTestInvisible = 패널 자신은 이벤트 불필요, 자식(그리드 위젯)은 정상 수신.
-	if (InventoryContainer)
-		InventoryContainer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	if (StorageContainer)
-		StorageContainer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	InventoryContainer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	StorageContainer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 
 	if (!InvGrid)
 	{

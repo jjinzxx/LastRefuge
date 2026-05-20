@@ -1,4 +1,4 @@
-# Last Refuge - 개발 인수인계 문서 (2026-05-20 진행 중)
+# Last Refuge - 개발 인수인계 문서 (2026-05-21 진행 중)
 
 > 이 문서는 어느 채팅에서든 이어서 개발할 수 있도록 현재까지의 진행 상황, 코드 구조, 미완성 작업을 정리한 문서입니다.
 > AI에게 이 문서를 첨부하고 "Last Refuge 프로젝트 Day N부터 이어서 진행해줘" 라고 하면 바로 이어받을 수 있습니다.
@@ -249,6 +249,7 @@ USTRUCT() FLRSavedItem {
 | 2026-05-18 | **UI 전체 미니멀 라인아트 스타일 전환** | 완료 |
 | 2026-05-19 | **PauseMenu/MainMenu 스타일 + 사운드 시스템 + 메인메뉴 저장 + 패키징** | 완료 |
 | 2026-05-20 | **컨테이너 등급/잠금 + 무게 이동속도 + ALROpenableDoor + 그리드 배경 버그 수정** | 완료 |
+| 2026-05-21 | **2차 코드 전체 리뷰 수정 + 툴바 드롭 수신 + 아이콘 실루엣 버그** | 완료 |
 
 ---
 
@@ -767,10 +768,106 @@ enum class ELRContainerType : uint8 { Normal, Locked, Alarmed };
 
 ---
 
+## 2026-05-21 — 2차 코드 전체 리뷰 수정 + 툴바 드롭 수신 + 아이콘 실루엣 버그
+
+### 완료 — 크래시 위험 null 역참조 수정
+
+| 파일 | 위치 | 수정 내용 |
+|---|---|---|
+| `LRBot.cpp` | `TakeDamage()` | `GetAnimInstance()` null 체크 없이 `Montage_Play` 호출 → `if (UAnimInstance* Anim = ...)` 가드 추가 |
+| `LRBot.cpp` | `TakedownKill()` | 동일 패턴 — 사망 몽타쥬 재생 전 null 체크 |
+| `LRBotAIController.cpp` | `TryMeleeAttack()` | 동일 패턴 — 근접 공격 몽타쥬 재생 전 null 체크 |
+
+### 완료 — const_cast 제거 (LRSaveGame.cpp)
+
+- `ItemRegistry.Find()` 반환 타입을 `const ULRItemDataAsset* const*` 대신 `ULRItemDataAsset* const*`로 수정
+- 불필요한 `const_cast<ULRItemDataAsset*>(*DataPtr)` 제거 — 인벤/툴바 두 복원 경로 모두 수정
+
+### 완료 — 컨텍스트 메뉴 중복 바인딩 방지 (LRContextMenuWidget.cpp)
+
+- `InitMenu()` 재호출 시 `BackdropButton->OnClicked`에 동일 핸들러가 중복 등록되는 문제
+- `!BackdropButton->OnClicked.IsAlreadyBound(this, &ULRContextMenuWidget::OnBackdropClicked)` 조건 추가
+
+### 완료 — 그리드 인벤토리 드래그 드롭 안정화 (LRInventoryGridWidget.cpp)
+
+#### InitGrid 재열기 핸들 누수 수정
+- 위젯 재사용 시 기존 `OnGridChanged` 핸들을 `Remove()` 후 `Reset()` — 재열기마다 RebuildGrid 중복 호출 방지
+
+#### 스택 분리 드래그 SourceGrid 판단 로직 수정
+- **기존**: `bRightDrag && DraggedItemData.Quantity == 1` 조건으로 판단 → Quantity 덮어쓰기 이후 비교라 항상 nullptr
+- **수정**: `OriginalQuantity` 캐시를 덮어쓰기 이전에 보존 → `bRightDrag && OriginalQuantity > 1` 조건으로 정확히 판단
+  - 스택 분리(우클릭, 원본 수량 > 1): `SourceGrid = nullptr` (그리드에 잔존, 복원 불필요)
+  - 단일 아이템 우클릭 / 좌클릭 전체: `SourceGrid = GridComponent` (RemoveItem됨, 취소 시 복원 필요)
+
+#### 드래그 시작 좌상단 배치 버그 수정
+- **기존**: `EDragPivot::MouseDown` → `NewObject<UImage>` 첫 프레임에 AbsolutePosition=0,0 → 화면 좌상단에 아이콘 배치 후 커서 위치로 이동
+- **수정**: `EDragPivot::CenterCenter` → Pivot 오프셋 = ImageSize/2. 브러시 ImageSize(ItemPxSize)가 첫 프레임부터 적용되어 정확한 위치에 배치
+
+#### 이중 복원 버그 수정
+- `NativeOnDrop`에서 배치 실패 시 선제 복원 후 `return false` → NativeOnDragCancelled 복원과 중복 발생
+- 선제 복원 제거 → `NativeOnDragCancelled` 단일 경로에서만 복원 처리
+
+#### 스택 분리 드래그 취소 복원 추가
+- `NativeOnDragCancelled`: `SourceGrid == nullptr`이고 `SourceItemID != INDEX_NONE`이면 `GridComponent->AddToStack()` 호출
+- 스택 분리 후 드롭 취소 시 원본 스택에 수량 반환
+
+### 완료 — HUD 위젯 수명 관리 개선
+
+**LRHudWidget.h/.cpp — NativeDestruct 추가:**
+- `RemoveFromParent()` 후에도 캐릭터 이벤트가 발생하면 이미 제거된 HUD가 반응하는 버그 방지
+- `OnHealthChanged`, `OnStaminaChanged`, `OnSearchProgressChanged/Started/Ended`, `OnInteractionPromptChanged`, `OnToolbarSlotChanged` 델리게이트 명시적 해제
+
+**LRCharacter.h — 멤버 추가:**
+- `TObjectPtr<ULRHudWidget> HudWidget` — HUD 참조 보관 (Z-order 변경에 필요)
+- `IA_Interact`, `IA_Inventory`를 raw pointer → `TObjectPtr<UInputAction>`으로 통일
+- `TArray<TWeakObjectPtr<ALRBot>> CachedBots`, `BotCacheTimer`, `BotCacheInterval` — 봇 캐시 (Tick 최적화)
+
+**LRCharacter.cpp — HUD 생성 방식 수정:**
+- `CreateWidget(GetWorld(), ...)` → `CreateWidget(PC, ...)` (PlayerController outer)
+- 이유: `NativeConstruct`에서 `GetOwningPlayerPawn()`이 올바른 ALRCharacter를 반환하려면 PC가 outer여야 함
+
+**LRCharacter.cpp — Tick 봇 캐시 최적화:**
+- `BotCacheInterval(0.5초)`마다만 `GetAllActorsOfClass` 호출, 나머지 프레임은 캐시 순회
+- `TWeakObjectPtr` — GC 시 자동 무효화, `IsValid()` 체크로 안전 접근
+
+### 완료 — 툴바 슬롯 드래그 드롭 수신 불가 수정
+
+**원인:**
+- Slate 드롭 이벤트는 최상위 히트테스트 위젯에서 처리 후 **부모 체인으로만** 버블링
+- HUD(Z=0)와 인벤토리(Z=5)는 `SOverlay` 형제 노드 → 인벤토리 위젯이 드롭 먼저 수신, HUD 툴바 슬롯에는 전달 불가
+
+**해결 — LRCharacter.cpp:**
+
+| 이벤트 | HUD Z-order |
+|---|---|
+| 인벤토리/보관함 열기 | RemoveFromParent → AddToViewport(6) (인벤 Z=5 위) |
+| 인벤토리/보관함 닫기 | RemoveFromParent → AddToViewport(0) (기본 복원) |
+
+- Remove → ReAdd 사이클로 NativeDestruct → NativeConstruct 순서 보장
+- NativeConstruct에서 `RefreshAllToolbarSlots()` 재호출 → 현재 툴바 상태 자동 복원
+- 적용 범위: `ToggleInventory()`, `OpenStorageScreen()`, `CloseStorageScreen()`
+
+### 완료 — 툴바 아이콘 실루엣 버그 수정 (LRToolbarSlotWidget.cpp)
+
+**원인:**
+- `SetBrushFromTexture()`: 내부적으로 기존 `Brush` 멤버의 ResourceObject만 교체 → Blueprint 디자이너에 설정된 TintColor(어두운 색)가 유지 → 아이콘이 실루엣처럼 표시
+
+**수정:**
+- `FSlateBrush`를 직접 생성하여 `TintColor = FLinearColor::White`, `DrawAs = Image`로 명시 설정 후 `SetBrush()`로 적용
+- 빈 슬롯: `DrawAs = NoDrawType` → 그리기 자체를 비활성화, 슬롯 배경만 표시
+
+### 미완료
+- 발자국 / 피격 / 아이템 / AI 보이스 실제 에셋 BP 슬롯 할당
+- WBP_LRHud HP/STA 바 프레임 정렬
+- HitReactMontage 에셋 준비 및 BP_LRBot 할당
+- 시연 영상 촬영
+
+---
+
 ## AI에게 전달할 세션 시작 문구
 
 ```text
-Last Refuge UE5.7 C++ 프로젝트, 2026-05-20 작업 완료 상태에서 이어서.
+Last Refuge UE5.7 C++ 프로젝트, 2026-05-21 작업 완료 상태에서 이어서.
 엔진: UE 5.7.4, IDE: Rider, 접두사: LR
 
 Day 13: 타르코프 스타일 그리드 인벤토리(ULRInventoryGridComponent, 10×5, 드래그앤드롭, 회전, Shift+클릭 이동),
@@ -806,6 +903,23 @@ Day 17: HP/STA 바 UProgressBar로 교체(PB_HP, PB_Sta), ULRStatusComponent Get
       (OnGridChanged 바인딩, Weight/MaxCarryWeight Lerp 1.0→0.5)
     - DangerZone 저장 버그: ULRSaveGame::Save() FallbackStorageItems 파라미터로 GI 캐시 폴백
     - 그리드 배경 NativePaint 직접 렌더링(GridBackgroundColor UPROPERTY): 선과 픽셀 단위 일치
+2026-05-21:
+  완료:
+    - [크래시 수정] LRBot::TakeDamage, TakedownKill / LRBotAIController::TryMeleeAttack
+      GetAnimInstance() null 체크 추가 (몽타쥬 재생 전 null 역참조 방지)
+    - [코드 정리] LRSaveGame: const_cast 제거, ItemRegistry.Find() 반환 타입 수정
+    - [버그 수정] LRContextMenuWidget: IsAlreadyBound로 OnClicked 중복 바인딩 방지
+    - [안정화] LRInventoryGridWidget: InitGrid 재열기 핸들 누수 수정, OriginalQuantity 캐시로
+      SourceGrid 판단 로직 수정, CenterCenter 피벗으로 드래그 좌상단 배치 버그 수정,
+      NativeOnDrop 이중 복원 제거, 스택 분리 취소 시 AddToStack 복원
+    - [수명 관리] LRHudWidget NativeDestruct 추가 — RemoveFromParent 후 델리게이트 명시적 해제
+    - [최적화] LRCharacter Tick: 봇 TWeakObjectPtr 캐시(0.5초 갱신), GetAllActorsOfClass 빈도 감소
+    - [수정] LRCharacter HUD 생성: CreateWidget outer = PlayerController (NativeConstruct에서
+      GetOwningPlayerPawn() 올바른 값 반환 보장)
+    - [버그 수정] 툴바 슬롯 드롭 수신 불가: ToggleInventory/OpenStorageScreen/CloseStorageScreen에서
+      HUD Z=6(열기)/Z=0(닫기) 재배치 — SOverlay 형제 위계 문제로 Z-order로만 드롭 우선순위 결정
+    - [버그 수정] 툴바 아이콘 실루엣: RefreshSlot에서 FSlateBrush 직접 생성(TintColor=White,
+      DrawAs=Image) → SetBrushFromTexture의 기존 TintColor 잔존 문제 해소
   미완료:
     - 발자국/피격/아이템/AI 보이스 실제 에셋 BP 슬롯 할당
     - WBP_LRHud HP/STA 바 프레임 정렬

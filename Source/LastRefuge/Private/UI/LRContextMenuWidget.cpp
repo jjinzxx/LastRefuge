@@ -27,8 +27,8 @@ void ULRContextMenuWidget::InitMenu(
 		AddItem(FText::FromString(TEXT("사용하기")));
 	}
 
-	// 백드롭 버튼 — 메뉴 외부 클릭 시 닫기
-	if (BackdropButton)
+	// 백드롭 버튼 — 메뉴 외부 클릭 시 닫기 (IsAlreadyBound로 중복 바인딩 방지)
+	if (BackdropButton && !BackdropButton->OnClicked.IsAlreadyBound(this, &ULRContextMenuWidget::OnBackdropClicked))
 		BackdropButton->OnClicked.AddDynamic(this, &ULRContextMenuWidget::OnBackdropClicked);
 
 	// [정보] — 모든 아이템

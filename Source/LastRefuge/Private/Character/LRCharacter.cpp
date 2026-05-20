@@ -148,12 +148,16 @@ void ALRCharacter::BeginPlay()
     InventoryGrid->OnGridChanged.AddUObject(this, &ALRCharacter::UpdateMovementSpeed);
 
     // HUD 생성 (로컬 플레이어만)
+    // GetWorld() 대신 PlayerController를 outer로 전달해야
+    // NativeConstruct에서 GetOwningPlayerPawn()이 this(ALRCharacter)를 올바르게 반환함.
+    // GetWorld() 사용 시 위젯 소유자가 모호해져 OwnerCharacter = nullptr → 초기화 전체 skip.
     if (IsLocallyControlled() && HudWidgetClass)
     {
-        ULRHudWidget* HudWidget = CreateWidget<ULRHudWidget>(GetWorld(), HudWidgetClass);
-        if (HudWidget)
+        if (APlayerController* PC = Cast<APlayerController>(GetController()))
         {
-            HudWidget->AddToViewport();
+            HudWidget = CreateWidget<ULRHudWidget>(PC, HudWidgetClass);
+            if (HudWidget)
+                HudWidget->AddToViewport();
         }
     }
 }
@@ -481,12 +485,23 @@ void ALRCharacter::Tick(float DeltaTime)
         const float TakedownAngle = 60.f;
         bool bCanTakedown = false;
 
-        TArray<AActor*> NearBots;
-        UGameplayStatics::GetAllActorsOfClass(GetWorld(), ALRBot::StaticClass(), NearBots);
-        for (AActor* Actor : NearBots)
+        // 봇 캐시 갱신 (BotCacheInterval마다 — 매 프레임 GetAllActorsOfClass 방지)
+        BotCacheTimer -= DeltaTime;
+        if (BotCacheTimer <= 0.f)
         {
-            ALRBot* Bot = Cast<ALRBot>(Actor);
-            if (!Bot || Bot->bIsDead) continue;
+            BotCacheTimer = BotCacheInterval;
+            TArray<AActor*> Found;
+            UGameplayStatics::GetAllActorsOfClass(GetWorld(), ALRBot::StaticClass(), Found);
+            CachedBots.Reset(Found.Num());
+            for (AActor* A : Found)
+                if (ALRBot* B = Cast<ALRBot>(A))
+                    CachedBots.Add(B);
+        }
+
+        for (const TWeakObjectPtr<ALRBot>& BotPtr : CachedBots)
+        {
+            ALRBot* Bot = BotPtr.Get();
+            if (!IsValid(Bot) || Bot->bIsDead) continue;
             if (FVector::Dist(GetActorLocation(), Bot->GetActorLocation()) > TakedownRange) continue;
 
             const float Angle = FMath::RadiansToDegrees(FMath::Acos(
@@ -803,6 +818,16 @@ void ALRCharacter::ToggleInventory()
         // InitGrid에서 GridCanvas 앵커를 (0.5, 0.5)로 설정하므로
         // UMG가 자동으로 화면 중앙에 배치 — 수동 DPI 계산 불필요.
         InventoryWidget->AddToViewport(5);
+
+        // HUD를 인벤토리보다 위(Z=6)로 올려야 툴바 슬롯이 드롭 이벤트를 수신할 수 있음.
+        // Slate 드롭 이벤트는 최상위 히트테스트 위젯부터 처리 → 부모 체인만 버블링.
+        // HUD와 인벤토리는 SOverlay 형제 노드이므로 Z-order로만 우선순위 결정됨.
+        if (HudWidget)
+        {
+            HudWidget->RemoveFromParent();
+            HudWidget->AddToViewport(6);
+        }
+
         PC->SetShowMouseCursor(true);
         {
             FInputModeGameAndUI Mode;
@@ -818,6 +843,14 @@ void ALRCharacter::ToggleInventory()
         if (InventoryWidget)
         {
             InventoryWidget->RemoveFromParent();
+
+            // 인벤토리 닫히면 HUD를 기본 Z=0으로 복원
+            if (HudWidget)
+            {
+                HudWidget->RemoveFromParent();
+                HudWidget->AddToViewport(0);
+            }
+
             PC->SetShowMouseCursor(false);
             PC->SetInputMode(FInputModeGameOnly());
             PC->ResetIgnoreMoveInput();
@@ -857,6 +890,13 @@ void ALRCharacter::OpenStorageScreen(ULRInventoryGridComponent* InStorageGrid)
     StorageWidget->InitStorage(InventoryGrid, InStorageGrid);
     StorageWidget->AddToViewport(5);
 
+    // 보관함 열릴 때도 HUD를 Z=6으로 올려서 툴바 슬롯 드롭 수신 보장
+    if (HudWidget)
+    {
+        HudWidget->RemoveFromParent();
+        HudWidget->AddToViewport(6);
+    }
+
     PC->SetShowMouseCursor(true);
     {
         FInputModeGameAndUI Mode;
@@ -874,6 +914,13 @@ void ALRCharacter::CloseStorageScreen()
 {
     if (StorageWidget)
         StorageWidget->RemoveFromParent();
+
+    // 보관함 닫히면 HUD를 기본 Z=0으로 복원
+    if (HudWidget)
+    {
+        HudWidget->RemoveFromParent();
+        HudWidget->AddToViewport(0);
+    }
 
     StorageWidget    = nullptr;
     bStorageOpen     = false;

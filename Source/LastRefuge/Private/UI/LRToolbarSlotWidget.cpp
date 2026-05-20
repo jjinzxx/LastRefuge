@@ -26,12 +26,20 @@ void ULRToolbarSlotWidget::RefreshSlot(ULRItemDataAsset* ItemData, int32 Quantit
 {
 	if (ItemData && ItemData->ItemIcon)
 	{
-		IconImage->SetBrushFromTexture(ItemData->ItemIcon);
+		// SetBrushFromTexture는 기존 브러시의 TintColor를 유지해 실루엣처럼 보일 수 있음.
+		// FSlateBrush를 직접 생성해 TintColor를 White로 명시적으로 설정.
+		FSlateBrush NewBrush;
+		NewBrush.SetResourceObject(ItemData->ItemIcon);
+		NewBrush.TintColor = FSlateColor(FLinearColor::White);
+		NewBrush.DrawAs    = ESlateBrushDrawType::Image;
+		IconImage->SetBrush(NewBrush);
 		IconImage->SetColorAndOpacity(FLinearColor::White);
 	}
 	else
 	{
-		IconImage->SetBrushFromTexture(nullptr);
+		FSlateBrush EmptyBrush;
+		EmptyBrush.DrawAs = ESlateBrushDrawType::NoDrawType;
+		IconImage->SetBrush(EmptyBrush);
 		IconImage->SetColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.2f));
 	}
 

@@ -18,6 +18,15 @@ void ULRInventoryGridWidget::InitGrid(
 	ULRInventoryGridComponent* InStorageGrid,
 	float InSlotSize)
 {
+	// ⑦ 재열기·컴포넌트 교체 시 기존 바인딩 먼저 해제 (중복 RebuildGrid 호출 방지)
+	// NativeDestruct가 RemoveFromParent 시 핸들을 제거하지만,
+	// 위젯이 재사용될 경우를 대비해 방어적으로 이전 핸들을 정리
+	if (GridComponent && GridChangedHandle.IsValid())
+	{
+		GridComponent->OnGridChanged.Remove(GridChangedHandle);
+		GridChangedHandle.Reset();
+	}
+
 	GridComponent = InGridComponent;
 	StorageGrid   = InStorageGrid;
 	SlotSize      = InSlotSize;
@@ -301,12 +310,15 @@ void ULRInventoryGridWidget::NativeOnDragDetected(
 		|| InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton;
 	bRightClickPending = false;
 
+	// ① SourceGrid 판단을 위해 수정 전 원본 수량 보존
+	// (이후 bRightDrag+스택분리 시 DraggedItemData.Quantity를 1로 덮어쓰므로 미리 기록)
+	const int32 OriginalQuantity = DraggedItemData.Quantity;
+
 	// 우클릭 드래그: 스택에서 1개만 분리
 	if (bRightDrag && DraggedItemData.Quantity > 1)
 	{
 		GridComponent->ReduceQuantity(PendingDragItemID, 1);
-		DraggedItemData.Quantity = 1;
-		// SourceItemID = INDEX_NONE → 드롭 취소 시 원위치 복원 없음 (이미 분리됨)
+		DraggedItemData.Quantity = 1; // 분리된 1개짜리 아이템
 	}
 	else
 	{
@@ -316,7 +328,6 @@ void ULRInventoryGridWidget::NativeOnDragDetected(
 
 	ULRItemDragDropOperation* Op = NewObject<ULRItemDragDropOperation>(this);
 	Op->DraggedItem  = DraggedItemData;
-	Op->SourceGrid   = bRightDrag && DraggedItemData.Quantity == 1 ? nullptr : GridComponent;
 	Op->SourceItemID = PendingDragItemID;
 	const FVector2D ItemPxSize(
 		DraggedItemData.GetEffectiveWidth()  * SlotSize,
@@ -331,9 +342,16 @@ void ULRInventoryGridWidget::NativeOnDragDetected(
 		DragImage->SetBrush(Brush);
 	}
 	Op->DefaultDragVisual = DragImage;
-	// MouseDown: 클릭한 지점이 항상 커서 아래에 유지 → 드래그 이미지가 커서와 정렬
-	// TopLeft 사용 시 아이템 중심부 클릭하면 이미지가 오른쪽-아래로 밀리는 현상 발생
-	Op->Pivot             = EDragPivot::MouseDown;
+	// CenterCenter: 피벗 오프셋 = DesiredSize/2. Brush.ImageSize(=ItemPxSize)가
+	// TakeWidget()→SynchronizeProperties() 시 SImage에 적용되므로 첫 프레임부터 정확.
+	// (MouseDown 사용 시 NewObject<UImage>의 AbsolutePosition=0,0 → 첫 프레임 좌상단 배치 버그)
+	Op->Pivot             = EDragPivot::CenterCenter;
+
+	// ① SourceGrid 결정:
+	// - 스택 분리(우클릭 + 원본 수량 > 1): 아이템이 그리드에 남아있으므로 nullptr (복원 불필요)
+	// - 단일 아이템 우클릭(원본 수량 == 1): RemoveItem으로 제거됐으므로 취소 시 복원 필요
+	// - 좌클릭: RemoveItem으로 제거됐으므로 항상 복원 필요
+	Op->SourceGrid = (bRightDrag && OriginalQuantity > 1) ? nullptr : GridComponent;
 
 	PendingDragItemID = INDEX_NONE;
 	HidePreview();
@@ -513,10 +531,7 @@ bool ULRInventoryGridWidget::NativeOnDrop(
 	const bool bCanPlace = GridComponent->CheckPlacement(GridPos.X, GridPos.Y, Op->DraggedItem, bRotated);
 	if (!bCanPlace)
 	{
-		if (Op->SourceGrid)
-			Op->SourceGrid->PlaceItem(
-				Op->DraggedItem.GridX, Op->DraggedItem.GridY,
-				Op->DraggedItem, bRotated);
+		// 복원은 NativeOnDragCancelled 단일 경로에서만 처리 (여기서 하면 이중 복원 발생)
 		return false;
 	}
 
@@ -536,11 +551,19 @@ void ULRInventoryGridWidget::NativeOnDragCancelled(
 	HidePreview();
 
 	ULRItemDragDropOperation* Op = Cast<ULRItemDragDropOperation>(InOperation);
-	if (Op && Op->SourceGrid)
+	if (!Op) return;
+
+	if (Op->SourceGrid)
 	{
+		// 일반 드래그(좌클릭 or 단일 아이템 우클릭) — 원래 위치로 복원
 		Op->SourceGrid->PlaceItem(
 			Op->DraggedItem.GridX, Op->DraggedItem.GridY,
 			Op->DraggedItem, Op->DraggedItem.bIsRotated);
+	}
+	else if (Op->SourceItemID != INDEX_NONE && GridComponent)
+	{
+		// 스택 분리 드래그(우클릭) 취소 — ReduceQuantity로 차감된 수량을 원본에 반환
+		GridComponent->AddToStack(Op->SourceItemID, Op->DraggedItem.Quantity);
 	}
 }
 

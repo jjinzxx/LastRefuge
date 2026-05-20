@@ -53,6 +53,10 @@ private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<ULRInventoryGridComponent> InventoryGrid;
 
+    // HUD 위젯 참조 (NativeConstruct 바인딩 정상화를 위해 PlayerController로 생성 후 보관)
+    UPROPERTY()
+    TObjectPtr<ULRHudWidget> HudWidget;
+
     // 인벤토리 UI (탭으로 열고 닫음)
     UPROPERTY()
     TObjectPtr<ULRInventoryGridWidget> InventoryWidget;
@@ -252,11 +256,11 @@ protected:
     TObjectPtr<UInputAction> SprintAction;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* IA_Interact;
+    TObjectPtr<UInputAction> IA_Interact;
 
     // 인벤토리 열기/닫기 (Tab키)
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* IA_Inventory;
+    TObjectPtr<UInputAction> IA_Inventory;
 
     // === Crouch ===
     UPROPERTY(EditDefaultsOnly, Category = "Movement")
@@ -337,4 +341,10 @@ protected:
     AActor* CurrentInteractable;
 
     FText CurrentPromptText;
+
+    // Tick 성능 최적화: 제압 프롬프트용 봇 캐시 (매 프레임 GetAllActorsOfClass 방지)
+    // TWeakObjectPtr — UPROPERTY 없이도 GC 시 자동 무효화되어 dangling 위험 없음
+    TArray<TWeakObjectPtr<class ALRBot>> CachedBots;
+    float BotCacheTimer = 0.f;
+    static constexpr float BotCacheInterval = 0.5f;
 };

@@ -223,7 +223,8 @@ void ALRBotAIController::TryMeleeAttack()
     if (Dist > ControlledBot->MeleeRange) return;
 
     if (ControlledBot->MeleeAttackMontage)
-        ControlledBot->GetMesh()->GetAnimInstance()->Montage_Play(ControlledBot->MeleeAttackMontage);
+        if (UAnimInstance* Anim = ControlledBot->GetMesh()->GetAnimInstance())
+            Anim->Montage_Play(ControlledBot->MeleeAttackMontage);
 
     UGameplayStatics::ApplyDamage(
         TrackedPlayer, ControlledBot->MeleeDamage,

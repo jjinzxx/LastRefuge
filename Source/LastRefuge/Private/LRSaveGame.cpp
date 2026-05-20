@@ -113,11 +113,12 @@ void ULRSaveGame::Load(
 	// 인벤토리 + 창고 복원
 	for (const FLRSavedItem& SI : SaveObj->SavedItems)
 	{
-		const ULRItemDataAsset* const* DataPtr = ItemRegistry.Find(SI.ItemID);
+		// Find()는 const TMap에서 'V* const*'를 반환 — ULRItemDataAsset*는 mutable이므로 const_cast 불필요
+		ULRItemDataAsset* const* DataPtr = ItemRegistry.Find(SI.ItemID);
 		if (!DataPtr || !(*DataPtr)) { Skipped++; continue; }
 
 		FLRGridItem Item;
-		Item.ItemData = const_cast<ULRItemDataAsset*>(*DataPtr);
+		Item.ItemData = *DataPtr;
 		Item.Width    = (*DataPtr)->GridWidth;
 		Item.Height   = (*DataPtr)->GridHeight;
 		Item.Quantity = FMath::Max(1, SI.Quantity);
@@ -141,11 +142,11 @@ void ULRSaveGame::Load(
 	for (const FLRSavedItem& SI : SaveObj->SavedToolbarItems)
 	{
 		if (!SI.bIsToolbar || !OutToolbarItems.IsValidIndex(SI.ToolbarSlot)) continue;
-		const ULRItemDataAsset* const* DataPtr = ItemRegistry.Find(SI.ItemID);
+		ULRItemDataAsset* const* DataPtr = ItemRegistry.Find(SI.ItemID);
 		if (!DataPtr || !(*DataPtr)) continue;
 
 		FLRGridItem Item;
-		Item.ItemData = const_cast<ULRItemDataAsset*>(*DataPtr);
+		Item.ItemData = *DataPtr;
 		Item.Width    = (*DataPtr)->GridWidth;
 		Item.Height   = (*DataPtr)->GridHeight;
 		Item.Quantity = FMath::Max(1, SI.Quantity);

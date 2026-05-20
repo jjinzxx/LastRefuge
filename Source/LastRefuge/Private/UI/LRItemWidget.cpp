@@ -52,7 +52,7 @@ void ULRItemWidget::Init(const FLRGridItem& InItem, int32 InItemID,
 FReply ULRItemWidget::NativeOnMouseButtonDown(
 	const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[Item] MouseButtonDown — %s"), *GetName());
+	UE_LOG(LogTemp, Log, TEXT("[Item] MouseButtonDown — %s"), *GetName());
 
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 	{
@@ -95,7 +95,7 @@ void ULRItemWidget::NativeOnDragDetected(
 	const FGeometry& InGeometry, const FPointerEvent& InMouseEvent,
 	UDragDropOperation*& OutOperation)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[Item] DragDetected 시작 — %s"), *GetName());
+	UE_LOG(LogTemp, Log, TEXT("[Item] DragDetected 시작 — %s"), *GetName());
 
 	ULRItemDragDropOperation* Op = NewObject<ULRItemDragDropOperation>(this);
 	Op->DraggedItem  = GridItem;

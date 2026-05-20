@@ -47,6 +47,27 @@ void ULRHudWidget::NativeConstruct()
 	TB_Prompt->SetVisibility(ESlateVisibility::Hidden);
 }
 
+void ULRHudWidget::NativeDestruct()
+{
+	// NativeConstruct에서 AddDynamic한 델리게이트 명시적 해제
+	// UE가 UObject 소멸 시 자동 정리하지만, RemoveFromParent 후 Pawn 이벤트가
+	// 발생해 이미 Viewport에서 제거된 HUD가 반응하는 것을 방지
+	if (StatusComponent)
+	{
+		StatusComponent->OnHealthChanged.RemoveDynamic(this, &ULRHudWidget::OnHealthChanged);
+		StatusComponent->OnStaminaChanged.RemoveDynamic(this, &ULRHudWidget::OnStaminaChanged);
+	}
+	if (OwnerCharacter)
+	{
+		OwnerCharacter->OnSearchProgressChanged.RemoveDynamic(this, &ULRHudWidget::OnSearchProgressChanged);
+		OwnerCharacter->OnSearchStarted.RemoveDynamic(this, &ULRHudWidget::OnSearchStarted);
+		OwnerCharacter->OnSearchEnded.RemoveDynamic(this, &ULRHudWidget::OnSearchEnded);
+		OwnerCharacter->OnInteractionPromptChanged.RemoveDynamic(this, &ULRHudWidget::OnInteractionPromptChanged);
+		OwnerCharacter->OnToolbarSlotChanged.RemoveDynamic(this, &ULRHudWidget::OnToolbarSlotChanged);
+	}
+	Super::NativeDestruct();
+}
+
 void ULRHudWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
