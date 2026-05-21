@@ -24,11 +24,11 @@
 <!-- YouTube -->
 ![영상](https://www.youtube.com/watch?v=영상ID)
 <!-- 메인메뉴 -->
-![이미지](./images/.png)
+![이미지](./images/MainMenu.png)
 <!-- 수색 -->
-![이미지](./images/.png)
+![이미지](./images/Farming.png)
 <!-- 전투 -->
-![이미지](./images/.png)
+![이미지](./images/Fight.png)
 
 **주요 플레이 장면 구성**
 
@@ -77,6 +77,7 @@
 - 자세별 소음 반경 : 웅크리기 100 / 걷기 400 / 달리기 1200
 - 스테미나 소모(달리기) / 회복(정지), 소진 시 달리기 강제 중단
 - 발자국 사운드 : `UAudioComponent` 루프 방식, 자세별 피치·볼륨 변조
+
 
 **AI 시스템 (ALRBot / ALRBotAIController)**
 - Behavior Tree + Blackboard 기반 FSM
