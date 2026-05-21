@@ -10,6 +10,8 @@
 void ULRToolbarSlotWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	if (IconImage)
+		DefaultBrush = IconImage->GetBrush();
 	if (SlotNumberText)
 		SlotNumberText->SetText(FText::AsNumber(SlotIndex + 1));
 }
@@ -37,9 +39,7 @@ void ULRToolbarSlotWidget::RefreshSlot(ULRItemDataAsset* ItemData, int32 Quantit
 	}
 	else
 	{
-		FSlateBrush EmptyBrush;
-		EmptyBrush.DrawAs = ESlateBrushDrawType::NoDrawType;
-		IconImage->SetBrush(EmptyBrush);
+		IconImage->SetBrush(DefaultBrush);
 		IconImage->SetColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.2f));
 	}
 

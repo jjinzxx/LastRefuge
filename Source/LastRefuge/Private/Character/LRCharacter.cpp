@@ -629,6 +629,10 @@ void ALRCharacter::OnHealthChanged(float NewHealth, float MaxHealth)
         {
             GM->OnPlayerDied(GetController());
         }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("[Character] GameMode cast 실패 — World Settings GameMode 확인 필요"));
+        }
     }
 }
 

@@ -41,5 +41,6 @@ private:
 	UPROPERTY()
 	TObjectPtr<ALRCharacter> OwnerCharacter;
 
-	int32 SlotIndex = 0;
+	int32       SlotIndex    = 0;
+	FSlateBrush DefaultBrush;  // BP에서 설정된 배경 브러시 저장용
 };

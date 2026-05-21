@@ -22,6 +22,8 @@ void ULRItemWidget::Init(const FLRGridItem& InItem, int32 InItemID,
 	{
 		FSlateBrush Brush;
 		Brush.SetResourceObject(InItem.ItemData->ItemIcon);
+		Brush.TintColor = FSlateColor(FLinearColor::White);
+		Brush.DrawAs    = ESlateBrushDrawType::Image;
 		Brush.ImageSize = FVector2D(
 			InItem.GetEffectiveWidth()  * InSlotSize,
 			InItem.GetEffectiveHeight() * InSlotSize);

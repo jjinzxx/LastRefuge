@@ -548,9 +548,10 @@ BeginPlay
 체력 0
 → 사망 SFX
 → GameMode.OnPlayerDied() 호출
+→ GI.PersistentInventory / PersistentToolbarItems 초기화, bHasTravelData = true (창고는 유지)
 → 모든 봇 → 순찰 상태 초기화
-→ "SafeZone" 태그된 PlayerStart 찾아서 리스폰
-→ RespawnLevelName 설정되어 있으면 해당 레벨로 이동
+→ Pawn 제거 후 "SafeZone" 태그된 PlayerStart에서 리스폰
+→ RespawnLevelName 설정 시 해당 레벨로 이동
 ```
 
 ### 8-3. 데이터 지속성 구조

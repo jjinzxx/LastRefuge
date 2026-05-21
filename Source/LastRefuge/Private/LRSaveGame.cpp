@@ -92,7 +92,7 @@ void ULRSaveGame::Load(
 	const TMap<FString, ULRItemDataAsset*>& ItemRegistry,
 	UObject* WorldCtx)
 {
-	if (!WorldCtx || !InvGrid || !StorageGrid) return;
+	if (!WorldCtx || !InvGrid) return;
 
 	if (!UGameplayStatics::DoesSaveGameExist(ULRSaveGame::SlotName, ULRSaveGame::UserIndex))
 	{
@@ -124,6 +124,7 @@ void ULRSaveGame::Load(
 		Item.Quantity = FMath::Max(1, SI.Quantity);
 
 		ULRInventoryGridComponent* Target = SI.bIsStorage ? StorageGrid : InvGrid;
+		if (!Target) { Skipped++; continue; }
 		if (Target->PlaceItem(SI.GridX, SI.GridY, Item, SI.bIsRotated) != INDEX_NONE)
 		{
 			Restored++;

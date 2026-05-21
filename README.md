@@ -314,8 +314,17 @@
 
 - **문제** : 인벤토리에서 툴바로 아이템을 이동하면 아이콘이 원래 색 대신 어두운 실루엣으로 표시됐다.
 - **원인 분석** : `UImage::SetBrushFromTexture()`는 내부적으로 기존 `FSlateBrush`의 ResourceObject만 교체하고 TintColor를 그대로 유지한다. Blueprint 디자이너에서 설정된 어두운 TintColor가 잔존하여 아이콘을 실루엣처럼 렌더링했다.
-- **해결** : `FSlateBrush`를 직접 생성하여 `TintColor = FLinearColor::White`, `DrawAs = ESlateBrushDrawType::Image`로 명시 설정 후 `SetBrush()`로 적용. 빈 슬롯은 `DrawAs = NoDrawType`으로 그리기 자체를 비활성화.
-- **결과** : 툴바 아이콘이 원본 색상으로 정상 표시.
+- **해결** : `FSlateBrush`를 직접 생성하여 `TintColor = FLinearColor::White`, `DrawAs = ESlateBrushDrawType::Image`로 명시 설정 후 `SetBrush()`로 적용. 빈 슬롯은 `NativeConstruct`에서 BP 기본 브러시를 `DefaultBrush`로 저장해 두고 `SetBrush(DefaultBrush)`로 복원.
+- **결과** : 툴바 아이콘이 원본 색상으로 정상 표시, 빈 슬롯 배경도 유지.
+
+<br>
+
+**[10] 사망 후 부활 시 인벤토리·툴바 아이템이 그대로 유지되는 버그**
+
+- **문제** : 플레이어가 사망 후 부활하면 인벤토리와 툴바 아이템이 초기화되지 않고 그대로 유지됐다.
+- **원인 분석** : `ALRGameMode::OnPlayerDied`에서 `GI->PersistentInventory.Empty()`는 호출했지만 `bHasTravelData`를 `true`로 설정하지 않았다. 같은 맵 내 부활 시 `BeginPlay`는 `bHasTravelData == false`로 진입해 디스크 SaveGame을 로드하므로 GI 초기화가 무시됐다. `PersistentToolbarItems`도 초기화되지 않아 툴바도 그대로 유지됐다.
+- **해결** : `OnPlayerDied`에서 `PersistentToolbarItems.Empty()` 추가 및 `bHasTravelData = true` 설정. `BeginPlay`가 SaveGame 경로 대신 GI 복원 경로로 진입해 빈 인벤/툴바로 부활. `PersistentStorageItems`는 건드리지 않아 창고 보존.
+- **결과** : 부활 시 인벤토리·툴바 초기화 정상 동작, 기지 창고 아이템은 보존됨.
 
 <br><br>
 

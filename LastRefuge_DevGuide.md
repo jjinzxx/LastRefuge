@@ -115,7 +115,7 @@ Source/LastRefuge/
 - WBP_Storage Designer: Canvas Panel 2개(`InventoryContainer`, `StorageContainer`)만 배치.
   WBP_InventoryGrid 직접 배치 금지 (C++에서 동적 생성)
 
-### ULRSaveGame (LRSaveGame.h/.cpp) — Day 13 신규, Day 15·2026-05-20 수정
+### ULRSaveGame (LRSaveGame.h/.cpp) — Day 13 신규, Day 15·2026-05-20·2026-05-21 수정
 - SlotName: `"LRInventorySave"`
 - `Save(InvGrid, StorageGrid, ToolbarItems, WorldCtx, FallbackStorageItems)`: 인벤/보관함/툴바 직렬화 → `TArray<FLRSavedItem>`
 - `Load(InvGrid, StorageGrid, OutToolbarItems, ItemRegistry, WorldCtx)`: 그리드 초기화 후 복원. 배치 충돌 시 FindEmptySpace 폴백
@@ -920,6 +920,12 @@ Day 17: HP/STA 바 UProgressBar로 교체(PB_HP, PB_Sta), ULRStatusComponent Get
       HUD Z=6(열기)/Z=0(닫기) 재배치 — SOverlay 형제 위계 문제로 Z-order로만 드롭 우선순위 결정
     - [버그 수정] 툴바 아이콘 실루엣: RefreshSlot에서 FSlateBrush 직접 생성(TintColor=White,
       DrawAs=Image) → SetBrushFromTexture의 기존 TintColor 잔존 문제 해소
+    - [버그 수정] 사망 후 인벤/툴바 초기화 안 됨: OnPlayerDied에서 PersistentToolbarItems.Empty()
+      + bHasTravelData = true 추가 → BeginPlay가 SaveGame 로드 대신 GI 복원 경로 진입, 창고는 유지
+    - [버그 수정] 툴바 슬롯 배경 소실: NativeConstruct에서 DefaultBrush 저장,
+      빈 슬롯 복원 시 DefaultBrush 사용 → NoDrawType이 BP 배경 브러시 덮어쓰던 문제 해소
+    - [안정화] LRSaveGame::Load: StorageGrid nullptr 가드 분리(InvGrid만 필수, StorageGrid 없으면 창고 항목만 스킵)
+    - [코드 안전] LRItemWidget::Init: FSlateBrush TintColor=White·DrawAs=Image 명시 → 이전 브러시 잔류 색 방지
   미완료:
     - 발자국/피격/아이템/AI 보이스 실제 에셋 BP 슬롯 할당
     - WBP_LRHud HP/STA 바 프레임 정렬
