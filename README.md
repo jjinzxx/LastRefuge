@@ -289,6 +289,33 @@
 - **해결** : `BeginPlay()`에서 `GetCharacterMovement()->MaxWalkSpeed = WalkSpeed` 재적용. 봇(`ALRBot`)도 동일하게 `PatrolSpeed` 재적용.
 - **결과** : BP 디테일 패널에서 속도 조정 시 즉시 반영.
 
+<br>
+
+**[7] HUD NativeConstruct에서 GetOwningPlayerPawn()이 nullptr 반환**
+
+- **문제** : `ULRHudWidget::NativeConstruct()`에서 `GetOwningPlayerPawn()`으로 캐릭터 참조를 얻으려 했으나 null이 반환되어 델리게이트 바인딩이 전부 skip됐다.
+- **원인 분석** : `CreateWidget(GetWorld(), HudWidgetClass)`로 생성하면 위젯의 outer가 World가 되어, `GetOwningLocalPlayer()` → `GetPlayerController()` 체인이 null을 반환한다. outer가 PlayerController여야 `GetOwningPlayerPawn()`이 올바른 Pawn을 반환한다.
+- **해결** : `APlayerController* PC = Cast<APlayerController>(GetController())` 후 `CreateWidget(PC, HudWidgetClass)`로 변경.
+- **결과** : NativeConstruct에서 캐릭터 참조 정상 획득, 모든 델리게이트 바인딩 정상 동작.
+
+<br>
+
+**[8] 인벤토리 열린 상태에서 툴바 슬롯에 드래그 드롭 불가**
+
+- **문제** : 인벤토리 또는 보관함이 열린 상태에서 그리드 아이템을 HUD 툴바 슬롯으로 드래그해도 드롭 이벤트가 수신되지 않았다.
+- **원인 분석** : Slate 드롭 이벤트는 최상위 히트테스트 위젯에서 처리된 후 부모 체인으로만 버블링된다. HUD(Z=0)와 인벤토리(Z=5)는 `SOverlay` 형제 노드이므로, 인벤토리가 드롭을 먼저 수신하고 HUD 툴바 슬롯에는 전달되지 않았다.
+- **해결** : 인벤토리/보관함 열기 시 HUD를 `RemoveFromParent` → `AddToViewport(6)`으로 인벤(Z=5) 위로 올리고, 닫기 시 `AddToViewport(0)`으로 복원.
+- **결과** : 인벤토리 열린 상태에서 툴바 슬롯 드롭 정상 수신, 아이템 배치 가능.
+
+<br>
+
+**[9] 툴바 슬롯 아이콘이 실루엣처럼 검게 표시되는 버그**
+
+- **문제** : 인벤토리에서 툴바로 아이템을 이동하면 아이콘이 원래 색 대신 어두운 실루엣으로 표시됐다.
+- **원인 분석** : `UImage::SetBrushFromTexture()`는 내부적으로 기존 `FSlateBrush`의 ResourceObject만 교체하고 TintColor를 그대로 유지한다. Blueprint 디자이너에서 설정된 어두운 TintColor가 잔존하여 아이콘을 실루엣처럼 렌더링했다.
+- **해결** : `FSlateBrush`를 직접 생성하여 `TintColor = FLinearColor::White`, `DrawAs = ESlateBrushDrawType::Image`로 명시 설정 후 `SetBrush()`로 적용. 빈 슬롯은 `DrawAs = NoDrawType`으로 그리기 자체를 비활성화.
+- **결과** : 툴바 아이콘이 원본 색상으로 정상 표시.
+
 <br><br>
 
 ### 느낀 점 및 개선 계획

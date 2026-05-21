@@ -200,8 +200,42 @@ void ALRCharacter::UpdateMovementSpeed()
 
 ### 3-7. 근접 전투 & 제압
 
-- **공격(LMB):** 250cm 앞까지 히트 스캔, 쿨다운 0.8초, 25 데미지
+- **공격(LMB):** 250cm 앞까지 히트 스캔, 쿨다운 0.8초, 30 데미지
 - **제압(F키):** 봇 뒤에서만 가능, 봇 라인트레이스로 위치 검증 후 즉사 처리
+
+### 3-8. Tick 성능 최적화 — 봇 캐시
+
+제압 판정을 위해 Tick마다 `GetAllActorsOfClass`를 호출하면 봇이 많아질수록 부담이 커집니다. 0.5초 간격 캐시로 해결:
+
+```cpp
+// LRCharacter.h
+TArray<TWeakObjectPtr<ALRBot>> CachedBots;
+float BotCacheTimer = 0.f;
+static constexpr float BotCacheInterval = 0.5f;
+
+// LRCharacter.cpp — Tick
+BotCacheTimer -= DeltaTime;
+if (BotCacheTimer <= 0.f)
+{
+    BotCacheTimer = BotCacheInterval;
+    TArray<AActor*> Found;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), ALRBot::StaticClass(), Found);
+    CachedBots.Reset(Found.Num());
+    for (AActor* A : Found)
+        if (ALRBot* B = Cast<ALRBot>(A))
+            CachedBots.Add(B);
+}
+
+for (const TWeakObjectPtr<ALRBot>& BotPtr : CachedBots)
+{
+    ALRBot* Bot = BotPtr.Get();
+    if (!IsValid(Bot) || Bot->bIsDead) continue;
+    // 제압 거리/각도 판정 ...
+}
+```
+
+- `TWeakObjectPtr` — UPROPERTY 없이도 GC 시 자동 무효화, dangling 포인터 위험 없음
+- `IsValid()` 체크로 GC 직후 프레임에도 안전한 접근 보장
 
 <br><br>
 
@@ -431,6 +465,32 @@ StatusComp->OnHealthChanged.Broadcast(NewHealth);
 // HUD가 수신
 StatusComp->OnHealthChanged.AddDynamic(this, &ULRHudWidget::UpdateHealthBar);
 ```
+
+**NativeDestruct — 델리게이트 명시적 해제:**
+```cpp
+// HUD를 RemoveFromParent 후 재추가하는 도중 캐릭터 이벤트가 발생하면
+// 이미 Viewport에서 제거된 HUD가 반응할 수 있음 → NativeDestruct에서 해제
+void ULRHudWidget::NativeDestruct()
+{
+    if (StatusComponent)
+    {
+        StatusComponent->OnHealthChanged.RemoveDynamic(this, &ULRHudWidget::OnHealthChanged);
+        StatusComponent->OnStaminaChanged.RemoveDynamic(this, &ULRHudWidget::OnStaminaChanged);
+    }
+    if (OwnerCharacter) { /* 검색/프롬프트/툴바 델리게이트 해제 */ }
+    Super::NativeDestruct();
+}
+```
+
+**HUD Z-order — 인벤토리/보관함 열기 시 툴바 드롭 수신 보장:**
+```
+HUD(Z=0) + 인벤토리(Z=5) → HUD 툴바가 인벤 위젯 뒤에 묻혀 드롭 이벤트 수신 불가
+해결: 인벤/보관함 열기 → HUD RemoveFromParent → AddToViewport(6)
+     인벤/보관함 닫기 → HUD RemoveFromParent → AddToViewport(0) 복원
+```
+- Slate 드롭 이벤트는 최상위 히트테스트 위젯에서 처리 후 부모 체인으로만 버블링
+- HUD와 인벤토리는 `SOverlay` 형제 노드이므로 Z-order로만 우선순위 결정됨
+- `ALRCharacter`가 `TObjectPtr<ULRHudWidget> HudWidget` 멤버로 HUD 참조를 보관
 
 ### 7-2. 인벤토리 격자 위젯
 
