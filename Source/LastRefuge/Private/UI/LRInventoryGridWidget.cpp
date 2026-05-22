@@ -48,6 +48,10 @@ void ULRInventoryGridWidget::InitGrid(
 			S->SetSize(GridPxSize);
 			S->SetAutoSize(false);
 		}
+
+		// 아이템 위젯 내부 렌더링이 셀 경계를 넘어 보이지 않도록 클리핑 적용
+		// (WBP_ItemWidget 내 ItemIcon의 Blueprint 레이아웃 설정과 무관하게 그리드 밖 넘침 차단)
+		GridCanvas->SetClipping(EWidgetClipping::ClipToBounds);
 	}
 
 	// 배경은 NativePaint에서 직접 그리므로 DimOverlay 위젯 숨김
@@ -108,10 +112,18 @@ int32 ULRInventoryGridWidget::NativePaint(
 	const int32 Cols = GridComponent->GridWidth;
 	const int32 Rows = GridComponent->GridHeight;
 
-	// GridCanvas의 실제 화면 위치를 기준으로 그리드 선을 그림
-	FVector2D Origin = FVector2D::ZeroVector;
-	if (GridCanvas)
-		Origin = AllottedGeometry.AbsoluteToLocal(GridCanvas->GetCachedGeometry().GetAbsolutePosition());
+	// GridCanvas의 좌상단 위치를 Canvas Panel 배치 공식으로 직접 계산
+	// InitGrid에서 GridCanvas를 Anchors(0.5,0.5) + Alignment(0.5,0.5) + Position(0,0)으로 설정하므로:
+	//   TopLeft = ParentSize * 0.5 - GridPxSize * 0.5 = (ParentSize - GridPxSize) / 2
+	// GetCachedGeometry().GetAbsolutePosition()는 NativePaint 실행 시점에 이번 프레임 값이
+	// 보장되지 않으므로(GridCanvas가 LRInventoryGridWidget보다 늦게 Paint됨), 공식으로 대체.
+	// RebuildGrid에서 아이템 위젯을 SetPosition(GridToLocal(X,Y))로 GridCanvas 로컬에 배치하므로
+	// 이 공식이 두 좌표계를 완전히 일치시킴.
+	const FVector2D ParentSize = AllottedGeometry.GetLocalSize();
+	const FVector2D GridPxSize2(Cols * SlotSize, Rows * SlotSize);
+	FVector2D Origin;
+	Origin.X = FMath::RoundToFloat((ParentSize.X - GridPxSize2.X) * 0.5f);
+	Origin.Y = FMath::RoundToFloat((ParentSize.Y - GridPxSize2.Y) * 0.5f);
 
 	// 마우스 입력 좌표 보정에 사용 (NativeOnMouseMove / GetGridIndexFromMouse)
 	CachedGridOrigin = Origin;
@@ -475,6 +487,7 @@ void ULRInventoryGridWidget::RebuildGrid()
 		UCanvasPanelSlot* CanvasSlot = GridCanvas->AddChildToCanvas(ItemWidget);
 		if (CanvasSlot)
 		{
+			CanvasSlot->SetAutoSize(false);   // 런타임 추가 슬롯은 기본값이 false지만 명시적으로 보장
 			CanvasSlot->SetPosition(GridToLocal(Item.GridX, Item.GridY));
 			CanvasSlot->SetSize(FVector2D(
 				Item.GetEffectiveWidth()  * SlotSize,
