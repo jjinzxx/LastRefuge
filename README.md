@@ -27,8 +27,9 @@
 ![이미지](./images/MainMenu.png)
 <!-- 수색 -->
 ![이미지](./images/Farming.png)
-<!-- 전투 -->
-![이미지](./images/Fight.png)
+
+
+
 
 **주요 플레이 장면 구성**
 
@@ -72,12 +73,14 @@
 
 ### 핵심 시스템
 
+<!-- 이동 -->
+![이미지](./images/DoorCancel.gif)
+
 **이동 & 소음 (ALRCharacter / ULRStatusComponent)**
 - 자세별 이동 속도 : 웅크리기 100 / 걷기 250 / 달리기 400
 - 자세별 소음 반경 : 웅크리기 100 / 걷기 400 / 달리기 1200
 - 스테미나 소모(달리기) / 회복(정지), 소진 시 달리기 강제 중단
 - 발자국 사운드 : `UAudioComponent` 루프 방식, 자세별 피치·볼륨 변조
-
 
 **AI 시스템 (ALRBot / ALRBotAIController)**
 - Behavior Tree + Blackboard 기반 FSM
@@ -108,6 +111,9 @@
 - 아이템 스태킹 (`Quantity` 필드)
 - `NativePaint` 기반 라인아트 스타일 렌더링 (배치 가능 녹색 / 불가 적색)
 
+<!-- 보관함 -->
+![이미지](./images/Container.gif)
+
 **보관함 (ALRStorage / ULRStorageWidget)**
 - 인벤토리(좌) + 창고(우) 분할 UI
 - Shift+클릭으로 그리드 간 빠른 이동
@@ -116,6 +122,9 @@
 **툴바 (ULRToolbarSlotWidget)**
 - 1~4 슬롯, 인벤토리와 분리된 물리적 보관 공간
 - 숫자키 1~4 즉시 사용, 그리드에서 드래그앤드롭으로 배치
+
+<!-- 전투 -->
+![이미지](./images/Fight.gif)
 
 **전투 (ALRCharacter / ALRBot)**
 
