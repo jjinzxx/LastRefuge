@@ -20,9 +20,9 @@
 <br><br>
 
 ## In-Game Preview
-> 시연 영상 및 플레이 GIF는 촬영 완료 후 이 섹션에 추가될 예정입니다.
+> 시연 영상 및 플레이 영상 및 이미지
 <!-- YouTube -->
-![영상](https://www.youtube.com/watch?v=영상ID)
+[![영상](https://img.youtube.com/vi/7gIxvlW8dc0/sddefault.jpg)](https://www.youtube.com/watch?v=7gIxvlW8dc0)
 <!-- 메인메뉴 -->
 ![이미지](./images/MainMenu.png)
 <!-- 수색 -->
